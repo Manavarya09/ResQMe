@@ -24,7 +24,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#f48c25"
       },
       "edgeToEdgeEnabled": true,
       "package": "app.resqme.mobile",
@@ -61,6 +61,7 @@
       ],
       "expo-audio"
     ],
-    "scheme": "resqme"
+    "scheme": "resqme",
+    "primaryColor": "#f48c25"
   }
 }
