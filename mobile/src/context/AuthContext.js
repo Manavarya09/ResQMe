@@ -98,10 +98,12 @@ export function AuthProvider({ children }) {
 
   const settings = useMemo(() => ({ ...DEFAULT_SETTINGS, ...(user?.settings || {}) }), [user]);
   const updateSettings = useCallback((patch) => updateProfile({ settings: patch }), [updateProfile]);
+  // First-run setup is shown once per account until the user finishes (or skips) onboarding.
+  const needsOnboarding = !!token && !!user && settings.onboarded !== true;
 
   const value = useMemo(
-    () => ({ token, user, ready, settings, login, verifyMfa, register, logout, replaceSession, refreshUser, updateProfile, updateSettings }),
-    [token, user, ready, settings, login, verifyMfa, register, logout, replaceSession, refreshUser, updateProfile, updateSettings]
+    () => ({ token, user, ready, settings, needsOnboarding, login, verifyMfa, register, logout, replaceSession, refreshUser, updateProfile, updateSettings }),
+    [token, user, ready, settings, needsOnboarding, login, verifyMfa, register, logout, replaceSession, refreshUser, updateProfile, updateSettings]
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

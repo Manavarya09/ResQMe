@@ -22,6 +22,10 @@ import SecurityScreen from './src/screens/SecurityScreen';
 import IncidentScreen from './src/screens/IncidentScreen';
 import TrainingScreen from './src/screens/TrainingScreen';
 import TrainingDetailScreen from './src/screens/TrainingDetailScreen';
+import OnboardingScreen from './src/screens/onboarding';
+import ProfileScreen from './src/screens/ProfileScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
+import IncidentDetailScreen from './src/screens/IncidentDetailScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -69,7 +73,7 @@ function Tabs() {
 }
 
 export default function Navigation() {
-  const { token, ready } = useAuth();
+  const { token, ready, needsOnboarding } = useAuth();
   if (!ready) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.base }}>
@@ -82,6 +86,12 @@ export default function Navigation() {
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.base } }}>
         {!token ? (
           <Stack.Screen name="Auth" component={AuthScreen} />
+        ) : needsOnboarding ? (
+          <>
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ animation: 'fade' }} />
+            {/* An SOS or crash during onboarding must still open the incident screen. */}
+            <Stack.Screen name="Incident" component={IncidentScreen} options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+          </>
         ) : (
           <>
             <Stack.Screen name="Tabs" component={Tabs} />
@@ -91,6 +101,9 @@ export default function Navigation() {
             <Stack.Screen name="MedicalEdit" component={MedicalEditScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="Contacts" component={ContactsScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="Security" component={SecurityScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="History" component={HistoryScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="IncidentDetail" component={IncidentDetailScreen} options={{ animation: 'slide_from_right' }} />
           </>
         )}
       </Stack.Navigator>

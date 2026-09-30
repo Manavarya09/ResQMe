@@ -4,6 +4,7 @@ import Text from '../components/Text';
 import { Siren, Shield, Flame, Ambulance, PhoneCall, Activity, MapPin, Route, Bot, GraduationCap, ChevronRight, Zap, HeartHandshake } from 'lucide-react-native';
 import { Screen, Card, PressScale, SectionLabel, Pill, IconButton } from '../components/ui';
 import SOSButton from '../components/SOSButton';
+import SetupChecklist from '../components/SetupChecklist';
 import HazardIcon, { hazardLabel } from '../components/HazardIcon';
 import { useAuth } from '../context/AuthContext';
 import { useEmergency, TRIGGER_LABEL } from '../context/EmergencyContext';
@@ -108,6 +109,8 @@ export default function HomeScreen({ navigation }) {
             <Pill label={hasFix ? `GPS ±${Math.round(location.accuracy || 0)}m` : 'Approximate'} color={hasFix ? colors.green : colors.primary} />
           </Card>
         </View>
+
+        <SetupChecklist onNavigate={(route) => navigation.navigate(route)} className="mx-5 mt-5" />
 
         {/* Quick dial */}
         <SectionLabel className="mx-5">{`Quick dial · ${country.flag} ${country.name}`}</SectionLabel>
