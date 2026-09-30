@@ -1,8 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Vibration } from 'react-native';
+import { AppState, Platform, Vibration } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as SMS from 'expo-sms';
 import { api } from '../lib/api';
+import { getJSON, setJSON, removeItem } from '../lib/storage';
+import { createRetryQueue, isRetryableError } from '../lib/retryQueue';
 import { getSocket } from '../lib/socket';
 import { mapsLink } from '../lib/geo';
 import { analyzeWindow, createImpactDetector } from '../lib/impactDetector';
@@ -22,6 +24,13 @@ export const TRIGGER_LABEL = {
 };
 
 const ACTIVE = ['open', 'acknowledged', 'dispatched'];
+const PENDING_KEY = 'resqme.pendingIncident';
+
+// Offline stand-in shown while the real incident is queued for delivery.
+const offlineIncident = (payload, queuedAt) => ({
+  id: null, offline: true, pendingSync: true, trigger: payload.trigger, status: 'open',
+  lat: payload.lat, lng: payload.lng, createdAt: queuedAt, triage: null,
+});
 const EmergencyContext = createContext(null);
 
 export function EmergencyProvider({ children }) {
@@ -37,6 +46,8 @@ export function EmergencyProvider({ children }) {
   const [error, setError] = useState(null);
   const [sensorsActive, setSensorsActive] = useState(false);
   const [lastImpact, setLastImpact] = useState(null);
+  // Offline SOS queue: the payload that failed to reach the server, retried until it lands.
+  const [queued, setQueued] = useState(null); // { payload, queuedAt, userId }
   const incidentRef = useRef(null);
   incidentRef.current = incident;
 
@@ -62,22 +73,33 @@ export function EmergencyProvider({ children }) {
     setError(null);
     const loc = locationRef.current;
     let created = null;
+    const payload = {
+      trigger,
+      lat: loc.lat,
+      lng: loc.lng,
+      accuracy: loc.accuracy ?? undefined,
+      note: extra.note,
+      impact: extra.impact,
+      sensorWindow: extra.samples?.slice(-250),
+      shareMedical: settings.shareMedical,
+    };
     try {
-      created = await api.createIncident({
-        trigger,
-        lat: loc.lat,
-        lng: loc.lng,
-        accuracy: loc.accuracy ?? undefined,
-        note: extra.note,
-        impact: extra.impact,
-        sensorWindow: extra.samples?.slice(-250),
-        shareMedical: settings.shareMedical,
-      });
+      created = await api.createIncident(payload);
       setIncident(created);
     } catch (e) {
-      // Server unreachable: keep an offline incident so the user still gets dial + SMS + guidance.
+      // Server unreachable: keep an offline incident so the user still gets dial + SMS + guidance,
+      // and queue the alert so it reaches responders as soon as the connection is back.
       setError(e.message);
-      created = { id: null, offline: true, trigger, status: 'open', lat: loc.lat, lng: loc.lng, createdAt: new Date().toISOString(), triage: null };
+      const queuedAt = new Date().toISOString();
+      if (isRetryableError(e)) {
+        const entry = { payload, queuedAt, userId: user?.id ?? null };
+        setQueued(entry);
+        // The raw sensor window can be large; persist without it (the in-memory retry keeps it).
+        setJSON(PENDING_KEY, { ...entry, payload: { ...payload, sensorWindow: undefined } });
+        created = offlineIncident(payload, queuedAt);
+      } else {
+        created = { ...offlineIncident(payload, queuedAt), pendingSync: false };
+      }
       setIncident(created);
     } finally {
       setSending(false);
@@ -85,7 +107,7 @@ export function EmergencyProvider({ children }) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
     navigate('Incident');
     notifyContacts(trigger, created);
-  }, [settings.shareMedical, notifyContacts]);
+  }, [settings.shareMedical, notifyContacts, user?.id]);
 
   const requestEmergency = useCallback((trigger, extra = {}) => {
     if (incidentRef.current && ACTIVE.includes(incidentRef.current.status)) {
@@ -118,7 +140,10 @@ export function EmergencyProvider({ children }) {
     if (cur?.id) {
       try { setIncident(await api.cancelIncident(cur.id)); } catch (e) { setError(e.message); }
     } else {
+      // Offline incident: the user is safe, so drop the queued alert instead of delivering it later.
       setIncident(null);
+      setQueued(null);
+      removeItem(PENDING_KEY);
     }
     setDrone(null);
   }, []);
@@ -133,9 +158,58 @@ export function EmergencyProvider({ children }) {
   }, [refreshIncident]);
 
   const dismissIncident = useCallback(() => {
+    if (incidentRef.current?.pendingSync) {
+      setQueued(null);
+      removeItem(PENDING_KEY);
+    }
     setIncident(null);
     setDrone(null);
   }, []);
+
+  // Restore a queued offline SOS after an app restart (only for the account that raised it).
+  useEffect(() => {
+    if (!token || !user?.id) return;
+    let cancelled = false;
+    getJSON(PENDING_KEY).then((entry) => {
+      if (cancelled || !entry?.payload) return;
+      if (entry.userId && entry.userId !== user.id) return;
+      const cur = incidentRef.current;
+      if (cur && !cur.offline && ACTIVE.includes(cur.status)) { removeItem(PENDING_KEY); return; }
+      setQueued((q) => q || entry);
+      setIncident((cur) => cur || offlineIncident(entry.payload, entry.queuedAt));
+    });
+    return () => { cancelled = true; };
+  }, [token, user?.id]);
+
+  // Deliver the queued SOS: retry every 10 s and immediately whenever the app returns to the
+  // foreground. On success the offline stand-in is swapped for the real server incident in place,
+  // so the Incident screen stays open and simply goes live.
+  useEffect(() => {
+    if (!token || !queued) return;
+    const queue = createRetryQueue({
+      task: () => api.createIncident(queued.payload),
+      onSuccess: (created) => {
+        removeItem(PENDING_KEY);
+        setQueued(null);
+        setError(null);
+        setIncident((cur) => (!cur || cur.offline ? created : cur));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      },
+      onFatal: (e) => {
+        // The server rejected the payload itself — stop retrying and leave the offline guidance up.
+        removeItem(PENDING_KEY);
+        setQueued(null);
+        setError(e.message);
+        setIncident((cur) => (cur?.offline ? { ...cur, pendingSync: false } : cur));
+      },
+    });
+    queue.start();
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') queue.trigger(); });
+    return () => {
+      queue.stop();
+      sub.remove();
+    };
+  }, [token, queued]);
 
   // Restore an in-progress incident after an app restart.
   useEffect(() => {
@@ -143,7 +217,11 @@ export function EmergencyProvider({ children }) {
     api.incidents()
       .then((list) => {
         const active = list?.find((i) => ACTIVE.includes(i.status));
-        if (active) setIncident(active);
+        if (!active) return;
+        // A live server incident supersedes any queued offline alert (it most likely got through).
+        setQueued(null);
+        removeItem(PENDING_KEY);
+        setIncident((cur) => (cur && !cur.offline ? cur : active));
       })
       .catch(() => {});
   }, [token]);
@@ -228,9 +306,10 @@ export function EmergencyProvider({ children }) {
 
   const value = useMemo(() => ({
     pending, sending, incident, drone, error, sensorsActive, lastImpact,
+    pendingSync: !!queued,
     isActive: !!incident && ACTIVE.includes(incident.status),
     requestEmergency, cancelPending, escalate, cancelIncident, requestDrone, refreshIncident, dismissIncident, simulateImpact,
-  }), [pending, sending, incident, drone, error, sensorsActive, lastImpact, requestEmergency, cancelPending, escalate, cancelIncident, requestDrone, refreshIncident, dismissIncident, simulateImpact]);
+  }), [pending, sending, incident, drone, error, sensorsActive, lastImpact, queued, requestEmergency, cancelPending, escalate, cancelIncident, requestDrone, refreshIncident, dismissIncident, simulateImpact]);
 
   return (
     <EmergencyContext.Provider value={value}>

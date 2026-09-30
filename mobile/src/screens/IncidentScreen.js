@@ -25,7 +25,7 @@ function useElapsed(since) {
 }
 
 export default function IncidentScreen({ navigation }) {
-  const { incident, drone, error, cancelIncident, requestDrone, dismissIncident } = useEmergency();
+  const { incident, drone, error, pendingSync, cancelIncident, requestDrone, dismissIncident } = useEmergency();
   const { location } = useLocation();
   const { user } = useAuth();
   const [droneBusy, setDroneBusy] = useState(false);
@@ -106,9 +106,12 @@ export default function IncidentScreen({ navigation }) {
         {(incident.offline || error) && (
           <View className="mx-5 mt-4 rounded-2xl bg-orange-50 border border-orange-200 p-3 flex-row items-center gap-3">
             <WifiOff color={colors.primary} size={18} />
-            <Text className="text-xs font-bold text-orange-800 flex-1">
-              {incident.offline ? `Couldn't reach ResQMe cloud. Call ${country.primary} now — your contacts have been sent an SMS with your location.` : error}
-            </Text>
+            <View className="flex-1">
+              <Text className="text-xs font-bold text-orange-800">
+                {incident.offline ? `Couldn't reach ResQMe cloud. Call ${country.primary} now — your contacts have been sent an SMS with your location.` : error}
+              </Text>
+              {pendingSync ? <Text className="text-[11px] font-semibold text-orange-700 mt-1">Retrying every 10 s — responders are alerted as soon as you're back online.</Text> : null}
+            </View>
           </View>
         )}
 
