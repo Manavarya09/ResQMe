@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { api } from '../lib/api';
-import { getSocket } from '../lib/socket';
+import { onSocketEvent } from '../lib/socket';
 import { haversineM } from '../lib/geo';
 import { useLocation } from '../context/LocationContext';
 import { useAuth } from '../context/AuthContext';
@@ -78,15 +78,12 @@ export function useHazards({ radiusKm = 10 } = {}) {
   }, [refresh, cell, hasFix]);
 
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
     const onNew = (h) => {
       setHazards((prev) => withDistance([h, ...prev.filter((p) => p.id !== h.id)]));
       if (settings.hazardAlerts && haversineM(locRef.current, h) <= ALERT_RADIUS_M) notifyHazard(h);
     };
-    socket.on('hazard:new', onNew);
-    return () => socket.off('hazard:new', onNew);
-  }, [token, withDistance, settings.hazardAlerts]);
+    return onSocketEvent('hazard:new', onNew);
+  }, [withDistance, settings.hazardAlerts]);
 
   return { hazards, loading, error, refresh };
 }
