@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, Pressable, TextInput, Switch, ActivityIndicator, Animated } from 'react-native';
+import { View, Pressable, TextInput, Switch, ActivityIndicator, Animated } from 'react-native';
+import Text from './Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
-import { colors, raised, inset } from '../theme';
+import { colors, raised, inset, fonts } from '../theme';
 
 export function Screen({ children, className = '', edges = ['top'] }) {
   return (
@@ -136,7 +137,7 @@ export function Field({ label, className = '', ...props }) {
         <TextInput
           placeholderTextColor={colors.muted}
           className="h-12 text-slate-700 font-semibold text-[15px]"
-          style={{ outlineStyle: 'none' }}
+          style={{ outlineStyle: 'none', fontFamily: fonts.semibold }}
           {...props}
         />
       </View>

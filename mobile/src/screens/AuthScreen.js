@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import Text from '../components/Text';
 import { ShieldPlus, Activity, HeartPulse, Radio, KeyRound } from 'lucide-react-native';
 import { Screen, Field, Button, PressScale, Inset } from '../components/ui';
 import { useAuth } from '../context/AuthContext';

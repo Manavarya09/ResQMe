@@ -44,7 +44,7 @@ function Tabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '800' },
+        tabBarLabelStyle: { fontSize: 10, fontFamily: 'Manrope_800ExtraBold' },
         tabBarStyle: {
           backgroundColor: colors.base,
           borderTopWidth: 1,

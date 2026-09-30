@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { View, ScrollView, Modal, Pressable, ActivityIndicator } from 'react-native';
+import Text from '../components/Text';
 import QRCode from 'react-native-qrcode-svg';
 import { QrCode, Radio, AlertTriangle, Activity, Pill as PillIcon, Phone, ChevronRight, Droplet, HeartHandshake, Pencil, Lock, X, Cake } from 'lucide-react-native';
 import { Screen, Header, Card, Inset, IconButton, PressScale, Pill, SectionLabel, EmptyState, Button } from '../components/ui';

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Linking, Alert, Platform } from 'react-native';
+import { View, ScrollView, Linking, Alert, Platform } from 'react-native';
+import Text from '../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Siren, Phone, Bot, Plane, GraduationCap, ShieldCheck, MapPin, HeartPulse, Users, CheckCircle2, Circle, WifiOff, ChevronDown } from 'lucide-react-native';
 import RMap from '../components/map/RMap';

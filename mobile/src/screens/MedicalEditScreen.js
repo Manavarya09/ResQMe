@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import Text from '../components/Text';
 import { Plus, X, Save } from 'lucide-react-native';
 import { Screen, Header, Card, Field, Button, PressScale, SectionLabel, ToggleRow, Inset } from '../components/ui';
 import { useMedical } from '../hooks/useMedical';

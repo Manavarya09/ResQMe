@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, Image } from 'react-native';
+import { View, ScrollView, Image } from 'react-native';
+import Text from '../components/Text';
 import { PlayCircle, Clock } from 'lucide-react-native';
 import { Screen, Header, Card } from '../components/ui';
 import { TRAINING } from '../lib/training';

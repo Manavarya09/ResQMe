@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, Linking, Platform } from 'react-native';
+import { View, ScrollView, Linking, Platform } from 'react-native';
+import Text from '../components/Text';
 import { Siren, Shield, Flame, Ambulance, PhoneCall, Activity, MapPin, Route, Bot, GraduationCap, ChevronRight, Zap, HeartHandshake } from 'lucide-react-native';
 import { Screen, Card, PressScale, SectionLabel, Pill, IconButton } from '../components/ui';
 import SOSButton from '../components/SOSButton';

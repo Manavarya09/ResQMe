@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, Animated, Easing, ActivityIndicator } from 'react-native';
+import { View, Modal, Animated, Easing, ActivityIndicator } from 'react-native';
+import Text from './Text';
 import { ShieldCheck, Siren } from 'lucide-react-native';
 import { useEmergency, TRIGGER_LABEL } from '../context/EmergencyContext';
 import { PressScale } from './ui';

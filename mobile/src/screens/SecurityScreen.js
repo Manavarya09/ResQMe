@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Platform, Share, Alert } from 'react-native';
+import { View, ScrollView, Platform, Share, Alert } from 'react-native';
+import Text from '../components/Text';
 import QRCode from 'react-native-qrcode-svg';
 import { KeyRound, ShieldCheck, ShieldOff, LogOut, Download, Trash2, History, Copy } from 'lucide-react-native';
 import { Screen, Header, Card, Field, Button, SectionLabel, Pill, Inset } from '../components/ui';

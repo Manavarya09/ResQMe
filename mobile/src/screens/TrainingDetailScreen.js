@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, Animated, Linking } from 'react-native';
+import { View, ScrollView, Animated, Linking } from 'react-native';
+import Text from '../components/Text';
 import * as Haptics from 'expo-haptics';
 import { Phone, HeartPulse, Pause, Play, CheckCircle2 } from 'lucide-react-native';
 import { Screen, Header, Card, Button, PressScale } from '../components/ui';

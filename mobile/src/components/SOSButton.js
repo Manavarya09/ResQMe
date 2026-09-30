@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Animated, Easing, Platform } from 'react-native';
+import { View, Pressable, Animated, Easing, Platform } from 'react-native';
+import Text from './Text';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, glow } from '../theme';

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Linking, ActivityIndicator } from 'react-native';
+import { View, ScrollView, Linking, ActivityIndicator } from 'react-native';
+import Text from '../components/Text';
 import { Phone, Star, Trash2, UserPlus, Users } from 'lucide-react-native';
 import { Screen, Header, Card, Field, Button, PressScale, SectionLabel, EmptyState } from '../components/ui';
 import { api } from '../lib/api';

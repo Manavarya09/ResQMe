@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Platform } from 'react-native';
+import { View, ScrollView, Platform } from 'react-native';
+import Text from '../components/Text';
 import * as LocalAuthentication from 'expo-local-authentication';
 import {
   ShieldCheck, Mail, Smartphone, Lock, Satellite, Fingerprint, LogOut, Activity, MapPin, Bell, HeartPulse, Users,

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Platform } from 'react-native';
+import { View, Platform } from 'react-native';
+import Text from './Text';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Fingerprint } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
