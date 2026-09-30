@@ -45,6 +45,7 @@
     showHazards: true,
     socket: null,
     fresh: new Set(),
+    mfaToken: null, // pending second login step
   };
 
   // ------------------------------------------------------------------ utils
@@ -491,7 +492,7 @@
   }
 
   async function loadInitial() {
-    const [incs, drones] = await Promise.all([api('/api/incidents'), api('/api/drones')]);
+    const [incs, drones] = await Promise.all([api('/api/incidents?limit=200'), api('/api/drones')]);
     state.incidents.clear();
     incs.forEach((i) => state.incidents.set(i.id, i));
     drones.forEach((d) => state.drones.set(d.id, d));
@@ -507,7 +508,14 @@
     const s = io(API, { auth: { token: state.token }, transports: ['websocket', 'polling'] });
     state.socket = s;
     s.on('connect', () => setConn(true));
-    s.on('disconnect', () => setConn(false));
+    s.on('disconnect', (reason) => {
+      setConn(false);
+      // the server drops sockets when sessions are revoked (sign-out-all / password change):
+      // re-check the session — api() signs out on 401, otherwise reconnect
+      if (reason === 'io server disconnect' && state.socket === s) {
+        api('/api/me').then(() => { if (state.socket === s) s.connect(); }).catch(() => {});
+      }
+    });
     s.on('connect_error', (err) => {
       setConn(false);
       if (err && err.message === 'unauthorized') logout('Session expired, please sign in again.');
@@ -547,17 +555,30 @@
   }
 
   // ------------------------------------------------------------------ auth flow
+  function setMfaStep(on) {
+    if (!on) state.mfaToken = null;
+    $('credStep').hidden = on;
+    $('mfaStep').hidden = !on;
+    $('mfaBackBtn').hidden = !on;
+    $('loginHint').hidden = on;
+    $('loginBtn').textContent = on ? 'Verify' : 'Sign in';
+    $('mfaCode').value = '';
+    setTimeout(() => (on ? $('mfaCode') : $('loginEmail')).focus(), 0);
+  }
   function showLogin(msg) {
     $('app').hidden = true;
     $('login').hidden = false;
+    closeSecurityMenu();
+    closeModal();
+    setMfaStep(false);
     $('loginError').textContent = msg || '';
     $('loginPassword').value = '';
-    setTimeout(() => $('loginEmail').focus(), 0);
   }
   async function showApp() {
     $('login').hidden = true;
     $('app').hidden = false;
     $('whoami').textContent = state.me.name;
+    renderSecurityMenu();
     initMap();
     setTimeout(() => map.invalidateSize(), 0);
     renderSoundBtn();
@@ -575,30 +596,220 @@
   async function onLogin(e) {
     e.preventDefault();
     ensureAudio(); // user gesture unlocks WebAudio
-    const email = $('loginEmail').value.trim();
-    const password = $('loginPassword').value;
-    if (!email || !password) { $('loginError').textContent = 'Enter email and password.'; return; }
     const btn = $('loginBtn');
+    const mfaStep = !!state.mfaToken;
+    let body;
+    if (mfaStep) {
+      const code = $('mfaCode').value.trim();
+      if (!code) { $('loginError').textContent = 'Enter the code from your authenticator app.'; return; }
+      body = { mfaToken: state.mfaToken, code: normalizeCode(code) };
+    } else {
+      const email = $('loginEmail').value.trim();
+      const password = $('loginPassword').value;
+      if (!email || !password) { $('loginError').textContent = 'Enter email and password.'; return; }
+      body = { email, password };
+    }
     btn.disabled = true;
-    btn.textContent = 'Signing in…';
+    btn.textContent = mfaStep ? 'Verifying…' : 'Signing in…';
+    $('loginError').textContent = '';
     try {
-      const res = await api('/api/auth/login', { method: 'POST', body: { email, password } });
-      if (res.user.role !== 'responder') throw new Error('This account is not a responder account.');
+      const res = await api(mfaStep ? '/api/auth/mfa/verify' : '/api/auth/login', { method: 'POST', body });
+      if (res.mfaRequired) {
+        state.mfaToken = res.mfaToken;
+        $('loginPassword').value = '';
+        setMfaStep(true);
+        return;
+      }
+      if (res.user.role !== 'responder') { setMfaStep(false); throw new Error('This account is not a responder account.'); }
+      state.mfaToken = null;
       state.token = res.token;
       state.me = res.user;
       safeSet(TOKEN_KEY, res.token);
       await showApp();
     } catch (err) {
       $('loginError').textContent = err.message;
+      if (mfaStep && /expired|sign in again/i.test(err.message)) setMfaStep(false);
+      else if (mfaStep) $('mfaCode').select();
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Sign in';
+      btn.textContent = state.mfaToken ? 'Verify' : 'Sign in';
     }
+  }
+
+  // ------------------------------------------------------------------ security (MFA + sessions)
+  /** "123 456" → "123456"; recovery codes (letters) pass through for the server to normalise. */
+  function normalizeCode(raw) {
+    const s = String(raw || '').trim();
+    return /^[\d\s]+$/.test(s) ? s.replace(/\s/g, '') : s;
+  }
+  function renderSecurityMenu() {
+    if (!state.me) return;
+    const on = !!state.me.mfaEnabled;
+    $('mfaStatus').innerHTML = 'Two-factor: ' + (on ? '<b>On</b>' : '<b class="off">Off</b>');
+    $('mfaToggleBtn').textContent = on ? 'Turn off two-factor authentication' : 'Enable two-factor authentication';
+  }
+  function openSecurityMenu() {
+    renderSecurityMenu();
+    $('securityMenu').hidden = false;
+    $('securityBtn').setAttribute('aria-expanded', 'true');
+  }
+  function closeSecurityMenu() {
+    $('securityMenu').hidden = true;
+    $('securityBtn').setAttribute('aria-expanded', 'false');
+  }
+  function openModal(title, html) {
+    $('modalTitle').textContent = title;
+    $('modalBody').innerHTML = html;
+    $('modal').hidden = false;
+    const first = $('modalBody').querySelector('input, .btn-primary, .btn-danger');
+    if (first) setTimeout(() => first.focus(), 0);
+  }
+  function closeModal() { $('modal').hidden = true; $('modalBody').innerHTML = ''; }
+
+  // QR rendering is lazy-loaded only when enrolling; pinned version + SRI.
+  const QR_SRC = 'https://unpkg.com/qrcode-generator@1.4.4/qrcode.js';
+  const QR_SRI = 'sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k';
+  let qrLoading = null;
+  function loadQrLib() {
+    if (window.qrcode) return Promise.resolve(window.qrcode);
+    if (!qrLoading) {
+      qrLoading = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = QR_SRC;
+        s.integrity = QR_SRI;
+        s.crossOrigin = 'anonymous';
+        s.onload = () => (window.qrcode ? resolve(window.qrcode) : reject(new Error('QR library missing')));
+        s.onerror = () => { qrLoading = null; reject(new Error('Could not load QR library')); };
+        document.head.appendChild(s);
+      });
+    }
+    return qrLoading;
+  }
+
+  async function startMfaEnrolment() {
+    closeSecurityMenu();
+    let setup;
+    try {
+      setup = await api('/api/auth/mfa/setup', { method: 'POST' });
+    } catch (err) { toast(err.message, true); return; }
+    openModal('Enable two-factor authentication',
+      '<p>1. Scan this QR code with an authenticator app (Google Authenticator, 1Password, Authy…).</p>' +
+      '<div class="qr-box" id="qrBox"><span style="color:#555">Loading QR…</span></div>' +
+      '<p>Can’t scan? Enter this key manually:</p>' +
+      '<div class="secret" id="mfaSecret">' + esc(setup.secret.replace(/(.{4})/g, '$1 ').trim()) + '</div>' +
+      '<form id="mfaEnableForm"><label>2. Enter the 6-digit code it shows' +
+      '<input id="mfaEnableCode" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456"></label>' +
+      '<div class="form-error" id="mfaEnableErr" role="alert"></div>' +
+      '<div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Cancel</button>' +
+      '<button type="submit" class="btn btn-primary" id="mfaEnableBtn">Enable</button></div></form>');
+    loadQrLib().then((qrcode) => {
+      const qr = qrcode(0, 'M');
+      qr.addData(setup.otpauthUrl);
+      qr.make();
+      const box = $('qrBox');
+      if (box) box.innerHTML = '<img alt="QR code for your authenticator app" src="' + qr.createDataURL(6, 2) + '">';
+    }).catch(() => {
+      const box = $('qrBox');
+      if (box) box.innerHTML = '<span style="color:#555">QR unavailable. Use the key below.</span>';
+    });
+    $('mfaEnableForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = normalizeCode($('mfaEnableCode').value);
+      if (!/^\d{6}$/.test(code)) { $('mfaEnableErr').textContent = 'Enter the 6-digit code.'; return; }
+      $('mfaEnableBtn').disabled = true;
+      try {
+        const res = await api('/api/auth/mfa/enable', { method: 'POST', body: { code } });
+        state.me.mfaEnabled = true;
+        renderSecurityMenu();
+        showRecoveryCodes(res.recoveryCodes);
+      } catch (err) {
+        $('mfaEnableErr').textContent = err.message;
+        $('mfaEnableBtn').disabled = false;
+      }
+    });
+  }
+
+  function showRecoveryCodes(codes) {
+    openModal('Save your recovery codes',
+      '<p>Two-factor authentication is <b style="color:var(--green)">on</b>. Each code below signs you in once if you lose your phone.</p>' +
+      '<p class="warn-note">They are shown <b>only this once</b>. Store them somewhere safe, such as a password manager.</p>' +
+      '<div class="recovery-grid">' + codes.map((c) => '<code>' + esc(c) + '</code>').join('') + '</div>' +
+      '<div class="modal-actions"><button type="button" class="btn btn-ghost" id="copyCodesBtn">Copy</button>' +
+      '<button type="button" class="btn btn-primary" data-close>I saved them</button></div>');
+    $('copyCodesBtn').addEventListener('click', () => {
+      const text = codes.join('\n');
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject(new Error('no clipboard')))
+        .then(() => toast('Recovery codes copied'), () => toast('Copy failed, please write them down', true));
+    });
+  }
+
+  function startMfaDisable() {
+    closeSecurityMenu();
+    openModal('Turn off two-factor authentication',
+      '<p>Enter a current code from your authenticator app, or one of your recovery codes.</p>' +
+      '<form id="mfaDisableForm"><label>Code<input id="mfaDisableCode" class="code-input" autocomplete="one-time-code" maxlength="11" placeholder="123456"></label>' +
+      '<div class="form-error" id="mfaDisableErr" role="alert"></div>' +
+      '<div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Cancel</button>' +
+      '<button type="submit" class="btn btn-danger" id="mfaDisableBtn">Turn off</button></div></form>');
+    $('mfaDisableForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = normalizeCode($('mfaDisableCode').value);
+      if (!code) { $('mfaDisableErr').textContent = 'Enter a code.'; return; }
+      $('mfaDisableBtn').disabled = true;
+      try {
+        await api('/api/auth/mfa/disable', { method: 'POST', body: { code } });
+        state.me.mfaEnabled = false;
+        renderSecurityMenu();
+        closeModal();
+        toast('Two-factor authentication turned off');
+      } catch (err) {
+        $('mfaDisableErr').textContent = err.message;
+        $('mfaDisableBtn').disabled = false;
+      }
+    });
+  }
+
+  function confirmLogoutAll() {
+    closeSecurityMenu();
+    openModal('Sign out all sessions',
+      '<p>This signs out every device and browser using this account, including this one. You will need to sign in again.</p>' +
+      '<div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Cancel</button>' +
+      '<button type="button" class="btn btn-danger" id="logoutAllConfirm">Sign out everywhere</button></div>');
+    $('logoutAllConfirm').addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      // detach our socket first so the server-side disconnect is not reported as "session expired"
+      if (state.socket) { const s = state.socket; state.socket = null; s.disconnect(); }
+      try {
+        await api('/api/auth/logout-all', { method: 'POST' });
+        closeModal();
+        logout('All sessions were signed out.');
+      } catch (err) {
+        toast(err.message, true);
+        b.disabled = false;
+        if (state.token) connectSocket();
+      }
+    });
   }
 
   async function boot() {
     $('loginForm').addEventListener('submit', onLogin);
     $('logoutBtn').addEventListener('click', () => logout());
+    $('mfaBackBtn').addEventListener('click', () => { setMfaStep(false); $('loginError').textContent = ''; });
+    $('securityBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if ($('securityMenu').hidden) openSecurityMenu(); else closeSecurityMenu();
+    });
+    $('mfaToggleBtn').addEventListener('click', () => (state.me && state.me.mfaEnabled ? startMfaDisable() : startMfaEnrolment()));
+    $('logoutAllBtn').addEventListener('click', confirmLogoutAll);
+    document.addEventListener('click', (e) => { if (!e.target.closest('.menu-wrap')) closeSecurityMenu(); });
+    $('modalClose').addEventListener('click', closeModal);
+    $('modal').addEventListener('click', (e) => { if (e.target === $('modal') || e.target.closest('[data-close]')) closeModal(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (!$('modal').hidden) closeModal();
+      closeSecurityMenu();
+    });
     $('soundBtn').addEventListener('click', () => {
       state.sound = !state.sound;
       safeSet(SOUND_KEY, state.sound ? 'on' : 'off');

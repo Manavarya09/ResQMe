@@ -22,15 +22,24 @@
       </div>
       <h1>Responder Console</h1>
       <p class="muted">Sign in with a responder account to monitor and coordinate live incidents.</p>
-      <label>Email
-        <input id="loginEmail" type="email" placeholder="responder@resqme.app" autocomplete="off" required>
-      </label>
-      <label>Password
-        <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="new-password" required>
-      </label>
+      <div id="credStep">
+        <label>Email
+          <input id="loginEmail" type="email" placeholder="responder@resqme.app" autocomplete="off" required>
+        </label>
+        <label>Password
+          <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="new-password" required>
+        </label>
+      </div>
+      <div id="mfaStep" hidden>
+        <p class="mfa-lead">Two-factor authentication is on for this account. Enter the 6-digit code from your authenticator app, or a recovery code.</p>
+        <label>Verification code
+          <input id="mfaCode" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" maxlength="11" spellcheck="false">
+        </label>
+      </div>
       <div id="loginError" class="form-error" role="alert"></div>
       <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Sign in</button>
-      <p class="hint">Demo responder: <code>responder@resqme.app</code> / <code>Responder@123</code></p>
+      <button type="button" class="btn btn-ghost btn-block mfa-back" id="mfaBackBtn" hidden>Use a different account</button>
+      <p class="hint" id="loginHint">Demo responder: <code>responder@resqme.app</code> / <code>Responder@123</code></p>
     </form>
   </section>
 
@@ -54,6 +63,16 @@
         <span id="clock" class="clock mono">--:--:--</span>
         <button id="soundBtn" class="icon-btn" title="Toggle alert sound" aria-pressed="true"></button>
         <span id="whoami" class="whoami"></span>
+        <div class="menu-wrap">
+          <button id="securityBtn" class="btn btn-ghost btn-sm" aria-haspopup="menu" aria-expanded="false" aria-controls="securityMenu">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>Security
+          </button>
+          <div id="securityMenu" class="menu" role="menu" hidden>
+            <div class="menu-status" id="mfaStatus">Two-factor: …</div>
+            <button role="menuitem" class="menu-item" id="mfaToggleBtn">Enable two-factor authentication</button>
+            <button role="menuitem" class="menu-item danger" id="logoutAllBtn">Sign out all sessions</button>
+          </div>
+        </div>
         <button id="logoutBtn" class="btn btn-ghost btn-sm">Sign out</button>
       </div>
     </header>
@@ -102,6 +121,17 @@
         <div id="detailBody" hidden></div>
       </aside>
     </main>
+  </div>
+
+  <!-- ============ Security dialog ============ -->
+  <div id="modal" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h2 id="modalTitle">Security</h2>
+        <button class="icon-btn" id="modalClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+    </div>
   </div>
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
