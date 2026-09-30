@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { ShieldPlus, Activity, HeartPulse, Radio } from 'lucide-react-native';
+import { ShieldPlus, Activity, HeartPulse, Radio, KeyRound } from 'lucide-react-native';
 import { Screen, Field, Button, PressScale, Inset } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../config';
@@ -13,7 +13,9 @@ const FEATURES = [
 ];
 
 export default function AuthScreen() {
-  const { login, register } = useAuth();
+  const { login, verifyMfa, register } = useAuth();
+  const [mfa, setMfa] = useState(null); // { mfaToken } while waiting for a 2FA code
+  const [code, setCode] = useState('');
   const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -32,8 +34,10 @@ export default function AuthScreen() {
     }
     setLoading(true);
     try {
-      if (mode === 'login') await login(form.email, form.password);
-      else await register({ name: form.name.trim(), email: form.email, phone: form.phone.trim() || undefined, password: form.password });
+      if (mode === 'login') {
+        const r = await login(form.email, form.password);
+        if (r.mfaRequired) setMfa({ mfaToken: r.mfaToken });
+      } else await register({ name: form.name.trim(), email: form.email, phone: form.phone.trim() || undefined, password: form.password });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -45,13 +49,49 @@ export default function AuthScreen() {
     setError(null);
     setLoading(true);
     try {
-      await login('demo@resqme.app', 'Demo@1234');
+      const r = await login('demo@resqme.app', 'Demo@1234');
+      if (r.mfaRequired) setMfa({ mfaToken: r.mfaToken });
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const submitCode = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      await verifyMfa(mfa.mfaToken, code);
+    } catch (e) {
+      setError(e.status === 401 && /expired/i.test(e.message) ? 'Code step expired — sign in again.' : e.message);
+      if (/expired/i.test(e.message)) setMfa(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mfa) {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        <View className="flex-1 px-6 justify-center">
+          <View className="items-center mb-8">
+            <View className="w-20 h-20 rounded-[28px] bg-primary items-center justify-center mb-4" style={glow(colors.primary)}>
+              <KeyRound color="#fff" size={36} />
+            </View>
+            <Text className="text-2xl font-black text-slate-800">Two-factor check</Text>
+            <Text className="text-sm text-text-sub font-semibold text-center mt-1">Enter the 6-digit code from your authenticator app, or a recovery code.</Text>
+          </View>
+          <Field label="Code" value={code} onChangeText={setCode} placeholder="123456" keyboardType="number-pad" autoCapitalize="none" autoFocus onSubmitEditing={submitCode} />
+          {error ? <Text className="text-red-600 text-xs font-bold mb-4">{error}</Text> : null}
+          <Button title="Verify" onPress={submitCode} loading={loading} disabled={code.trim().length < 6} />
+          <PressScale onPress={() => { setMfa(null); setCode(''); setError(null); }}>
+            <Text className="text-center text-slate-400 font-bold text-sm mt-5">← Back to sign in</Text>
+          </PressScale>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen edges={['top', 'bottom']}>

@@ -66,12 +66,36 @@ automatically on your PC's LAN IP; override with `EXPO_PUBLIC_API_URL` if needed
 | User | `demo@resqme.app` | `Demo@1234` |
 | Responder | `responder@resqme.app` | `Responder@123` |
 
+## Production deployment (Docker)
+
+```bash
+cp .env.example .env            # set POSTGRES_PASSWORD, JWT_SECRET, MEDICAL_KEY, CORS_ORIGINS, PUBLIC_URL, OPENROUTER_API_KEY
+docker compose up -d --build    # db + ai + api (dashboard at :4100/dashboard)
+docker compose run --rm api npm run seed   # optional demo accounts — don't seed real deployments
+```
+
+In production the API refuses to start with weak secrets (`JWT_SECRET` < 32 chars, all-zero `MEDICAL_KEY`) or an unset
+`CORS_ORIGINS`. Put it behind TLS (reverse proxy / load balancer) and point the app at it with
+`EXPO_PUBLIC_API_URL=https://api.your-domain`. Health: `GET /health` (liveness + AI status), `GET /ready` (DB readiness).
+
+## Security
+
+- **Two-factor authentication** (TOTP + one-time recovery codes) for users and responders — app *Settings → Security* and the dashboard.
+- Access tokens carry a token version: *sign out all devices* and password changes revoke every existing session (HTTP and sockets).
+- AES-256-GCM encryption for medical IDs and MFA secrets; bcrypt passwords.
+- Rate limits on auth, SOS/incident creation, chat and hazard reports; strict CORS allowlist and Helmet headers in production.
+- Audit log of sign-ins, security changes, medical-ID QR views and incident actions — visible to the user, plus
+  full **data export** and **account deletion** (Settings → Security).
+- Structured JSON request logs that never include credentials, tokens or medical data.
+
 ## Testing
 
 ```bash
 npm test        # backend (Jest + Supertest) · ai-service (pytest) · mobile logic (Jest)
-npm run e2e     # full accident workflow against the running stack (14 steps)
+npm run e2e     # full accident workflow against the running stack
 ```
+
+CI (GitHub Actions) runs all three suites against a PostgreSQL service, bundle-checks the Android app and builds both Docker images.
 
 ## Repository layout
 

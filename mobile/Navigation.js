@@ -18,6 +18,7 @@ import MedicalIDScreen from './src/screens/MedicalIDScreen';
 import MedicalEditScreen from './src/screens/MedicalEditScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ContactsScreen from './src/screens/ContactsScreen';
+import SecurityScreen from './src/screens/SecurityScreen';
 import IncidentScreen from './src/screens/IncidentScreen';
 import TrainingScreen from './src/screens/TrainingScreen';
 import TrainingDetailScreen from './src/screens/TrainingDetailScreen';
@@ -89,6 +90,7 @@ export default function Navigation() {
             <Stack.Screen name="TrainingDetail" component={TrainingDetailScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="MedicalEdit" component={MedicalEditScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="Contacts" component={ContactsScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="Security" component={SecurityScreen} options={{ animation: 'slide_from_right' }} />
           </>
         )}
       </Stack.Navigator>

@@ -28,7 +28,7 @@ export default function MedicalIDScreen({ navigation }) {
     setQrErr(null);
     try {
       const t = await api.shareMedical();
-      setQr({ ...t, full: t.url.startsWith('http') ? t.url : `${API_BASE}${t.url}` });
+      setQr({ ...t, full: t.absoluteUrl || (t.url.startsWith('http') ? t.url : `${API_BASE}${t.url}`) });
     } catch (e) {
       setQrErr(e.message);
       setQr({ error: true });

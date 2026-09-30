@@ -13,7 +13,7 @@ if (args[0] === '--create-venv') {
   const sys = win ? 'python' : 'python3';
   let r = spawnSync(sys, ['-m', 'venv', '.venv'], { cwd: dir, stdio: 'inherit' });
   if (r.status) process.exit(r.status);
-  r = spawnSync(venvPy, ['-m', 'pip', 'install', '-r', 'requirements.txt'], { cwd: dir, stdio: 'inherit' });
+  r = spawnSync(venvPy, ['-m', 'pip', 'install', '-r', 'requirements-dev.txt'], { cwd: dir, stdio: 'inherit' });
   process.exit(r.status ?? 1);
 }
 if (!fs.existsSync(venvPy)) {

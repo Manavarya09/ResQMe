@@ -54,10 +54,29 @@ export function AuthProvider({ children }) {
     })();
   }, [applySession, logout]);
 
+  // Returns { mfaRequired, mfaToken } when the account has two-factor auth; the caller then
+  // collects a code and finishes with verifyMfa().
   const login = useCallback(async (email, password) => {
-    const { token: t, user: u } = await api.login({ email: email.trim().toLowerCase(), password });
+    const res = await api.login({ email: email.trim().toLowerCase(), password });
+    if (res.mfaRequired) return { mfaRequired: true, mfaToken: res.mfaToken };
+    await applySession(res.token, res.user);
+    return { mfaRequired: false };
+  }, [applySession]);
+
+  const verifyMfa = useCallback(async (mfaToken, code) => {
+    const { token: t, user: u } = await api.verifyMfa({ mfaToken, code: code.trim() });
     await applySession(t, u);
   }, [applySession]);
+
+  // Replace the session token (e.g. after a password change bumps the token version).
+  const replaceSession = useCallback((t, u) => applySession(t, u), [applySession]);
+  const refreshUser = useCallback(async () => {
+    try {
+      const u = await api.me();
+      setUser(u);
+      await setJSON(USER_KEY, u);
+    } catch {}
+  }, []);
 
   const register = useCallback(async (payload) => {
     const { token: t, user: u } = await api.register({ ...payload, email: payload.email.trim().toLowerCase() });
@@ -81,8 +100,8 @@ export function AuthProvider({ children }) {
   const updateSettings = useCallback((patch) => updateProfile({ settings: patch }), [updateProfile]);
 
   const value = useMemo(
-    () => ({ token, user, ready, settings, login, register, logout, updateProfile, updateSettings }),
-    [token, user, ready, settings, login, register, logout, updateProfile, updateSettings]
+    () => ({ token, user, ready, settings, login, verifyMfa, register, logout, replaceSession, refreshUser, updateProfile, updateSettings }),
+    [token, user, ready, settings, login, verifyMfa, register, logout, replaceSession, refreshUser, updateProfile, updateSettings]
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

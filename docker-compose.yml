@@ -1,0 +1,58 @@
+# ResQMe production-style stack: PostgreSQL + AI service + API/dashboard.
+#   cp .env.example .env   # fill in secrets
+#   docker compose up -d --build
+#   docker compose run --rm api npm run seed   # optional demo accounts
+name: resqme
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: resqme
+      POSTGRES_USER: resqme
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resqme -d resqme"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ai:
+    build: ./ai-service
+    restart: unless-stopped
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+      LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-12}
+    expose:
+      - "8100"
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      ai:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 4100
+      DATABASE_URL: postgres://resqme:${POSTGRES_PASSWORD}@db:5432/resqme
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      MEDICAL_KEY: ${MEDICAL_KEY:?set MEDICAL_KEY in .env}
+      AI_URL: http://ai:8100
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS in .env}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4100}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${API_PORT:-4100}:4100"
+
+volumes:
+  pgdata:

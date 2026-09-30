@@ -48,7 +48,8 @@ export default function SettingsScreen({ navigation }) {
         <Inset className="p-0">
           <Row icon={Mail} title="Email" value={user?.email} />
           <Row icon={Smartphone} title="Phone" value={user?.phone || 'Not set'} />
-          <Row icon={Lock} title="Data encryption" value="AES-256-GCM active" valueColor={colors.green} last />
+          <Row icon={Lock} title="Data encryption" value="AES-256-GCM active" valueColor={colors.green} />
+          <LinkRow icon={ShieldCheck} title={`Security & privacy · 2FA ${user?.mfaEnabled ? 'on' : 'off'}`} onPress={() => navigation.navigate('Security')} last />
         </Inset>
 
         <SectionLabel>Crash & fall detection</SectionLabel>
