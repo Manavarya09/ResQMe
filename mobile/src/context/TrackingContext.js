@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { checkCorridor, haversineM } from '../lib/geo';
+import { checkCorridor, haversineM, pathLengthM } from '../lib/geo';
+import { createRouteFetcher, straightRoute } from '../lib/routing';
 import { ROUTE_CORRIDOR_M, ROUTE_DEVIATION_GRACE_S, ARRIVAL_RADIUS_M } from '../config';
 import { useLocation } from './LocationContext';
 import { useEmergency } from './EmergencyContext';
@@ -22,6 +23,50 @@ export function TrackingProvider({ children }) {
   const firedRef = useRef(false);
 
   const route = useMemo(() => (waypoints.length ? [waypointsOrigin(trail, location, startedAt, waypoints), ...waypoints] : []), [waypoints, trail, location, startedAt]);
+
+  // ---------- walking route (OSRM, straight-line fallback) ----------
+  // The routing origin only moves when the user has moved > ROUTE_ANCHOR_M, so GPS jitter while
+  // planning doesn't re-request the route every few seconds.
+  const [anchor, setAnchor] = useState(null);
+  const origin = route[0];
+  useEffect(() => {
+    if (!origin) { setAnchor(null); return; }
+    setAnchor((a) => (!a || haversineM(a, origin) > ROUTE_ANCHOR_M ? { lat: origin.lat, lng: origin.lng } : a));
+  }, [origin?.lat, origin?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const routeKey = anchor && waypoints.length ? routeKeyOf([anchor, ...waypoints]) : null;
+  const [routed, setRouted] = useState(null); // { key, coords, distanceM, durationS, source }
+  const fetcherRef = useRef(null);
+  if (!fetcherRef.current) fetcherRef.current = createRouteFetcher({ debounceMs: 450 });
+  useEffect(() => {
+    const f = fetcherRef.current;
+    if (!routeKey) { f.cancel(); setRouted(null); return; }
+    const pts = [anchor, ...waypoints];
+    f.request(pts, (r) => setRouted({ ...r, key: routeKey }));
+    return () => f.cancel();
+  }, [routeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const routeReady = !!routed && routed.key === routeKey;
+  const routeLoading = !!routeKey && !routeReady;
+  // Routed geometry snaps to the nearest road, so stitch the real origin/destination onto its ends.
+  const routedPath = useMemo(() => {
+    if (!route.length) return [];
+    if (!routeReady || routed.coords.length < 2) return route;
+    const path = [...routed.coords];
+    const dest = route[route.length - 1];
+    if (haversineM(route[0], path[0]) > 3) path.unshift(route[0]);
+    if (haversineM(dest, path[path.length - 1]) > 3) path.push(dest);
+    return path;
+  }, [route, routed, routeReady]);
+  const routeInfo = useMemo(() => {
+    if (!route.length) return null;
+    const base = routeReady ? routed : straightRoute(route);
+    // Measure the stitched path (includes the hop from an off-road start onto the street) and
+    // scale the provider's ETA by the same factor so distance and time stay consistent.
+    const distanceM = pathLengthM(routedPath);
+    const pace = base.distanceM > 0 && base.durationS > 0 ? base.durationS / base.distanceM : 1 / 1.35;
+    return { distanceM, durationS: distanceM * pace, source: routeReady ? routed.source : 'straight', loading: routeLoading };
+  }, [route, routed, routeReady, routeLoading, routedPath]);
 
   const addWaypoint = useCallback((p) => {
     setWaypoints((w) => [...w, { lat: p.lat, lng: p.lng }]);
@@ -67,14 +112,14 @@ export function TrackingProvider({ children }) {
   }, [status]);
 
   useEffect(() => {
-    if (status !== 'tracking' || !route.length) return;
+    if (status !== 'tracking' || !routedPath.length) return;
     const dest = waypoints[waypoints.length - 1];
     if (haversineM(location, dest) <= ARRIVAL_RADIUS_M) {
       setStatus('arrived');
       setStartedAt(null);
       return;
     }
-    const c = checkCorridor(location, route, ROUTE_CORRIDOR_M);
+    const c = checkCorridor(location, routedPath, ROUTE_CORRIDOR_M);
     setDeviation((d) => ({ inside: c.inside, distanceM: c.distanceM, since: c.inside ? null : d.since ?? Date.now() }));
 
     if (firedRef.current) return;
@@ -92,11 +137,14 @@ export function TrackingProvider({ children }) {
   const remainingS = startedAt ? Math.max(0, durationMin * 60 - elapsedS) : durationMin * 60;
 
   const value = {
-    status, waypoints, route, trail, durationMin, setDurationMin, elapsedS, remainingS, deviation,
+    status, waypoints, route, routedPath, routeInfo, trail, durationMin, setDurationMin, elapsedS, remainingS, deviation,
     addWaypoint, undoWaypoint, clear, start, stop,
   };
   return <TrackingContext.Provider value={value}>{children}</TrackingContext.Provider>;
 }
+
+const ROUTE_ANCHOR_M = 30;
+const routeKeyOf = (pts) => pts.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
 
 // The route starts where the user was when tracking began (or where they are now while planning).
 function waypointsOrigin(trail, location, startedAt) {

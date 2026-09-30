@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Modal, Pressable, ScrollView, Linking, ActivityIndicator } from 'react-native';
+import Text from '../components/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Locate, Layers, Play, Square, Undo2, Trash2, ShieldCheck, Megaphone, Timer, Route, CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
+import { Locate, Layers, Play, Square, Undo2, Trash2, ShieldCheck, Megaphone, Timer, Route, CheckCircle2, AlertTriangle, X, Hospital, Shield, Navigation, Phone, Footprints, RefreshCw } from 'lucide-react-native';
 import RMap from '../components/map/RMap';
 import { PressScale, Button, Field, Pill } from '../components/ui';
 import HazardIcon, { hazardLabel } from '../components/HazardIcon';
@@ -10,9 +11,10 @@ import { useTracking } from '../context/TrackingContext';
 import { useEmergency } from '../context/EmergencyContext';
 import { useHazards } from '../hooks/useHazards';
 import { api } from '../lib/api';
-import { formatDistance, haversineM, pathLengthM } from '../lib/geo';
+import { formatDistance, formatDuration, remainingPathM } from '../lib/geo';
+import { fetchNearbyHelp, directionsUrl, telUrl, PLACE_LABEL } from '../lib/places';
 import { ROUTE_DEVIATION_GRACE_S } from '../config';
-import { colors, raised, severityColor } from '../theme';
+import { colors, raised, inset, severityColor } from '../theme';
 
 const DURATIONS = [10, 15, 25, 30, 45, 60];
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -25,6 +27,8 @@ export default function MapScreen() {
   const [follow, setFollow] = useState(true);
   const [showHazards, setShowHazards] = useState(true);
   const [reportOpen, setReportOpen] = useState(false);
+  const [sheetH, setSheetH] = useState(180);
+  const help = useNearbyHelp(location);
 
   const markers = useMemo(() => {
     const m = [];
@@ -32,10 +36,11 @@ export default function MapScreen() {
     t.waypoints.forEach((w, i) =>
       m.push({ id: `w${i}`, lat: w.lat, lng: w.lng, kind: i === t.waypoints.length - 1 ? 'dest' : 'waypoint', title: i === t.waypoints.length - 1 ? 'Destination' : `Stop ${i + 1}` })
     );
+    if (help.enabled) help.places.forEach((p) => m.push({ id: `p${p.id}`, lat: p.lat, lng: p.lng, kind: p.kind, color: PLACE_COLOR[p.kind], title: `${p.name} · ${formatDistance(p.distanceM)}` }));
     if (drone) m.push({ id: 'drone', lat: drone.lat, lng: drone.lng, kind: 'drone', title: `${drone.name} · ${drone.status}` });
     if (isActive && incident?.lat) m.push({ id: 'incident', lat: incident.lat, lng: incident.lng, kind: 'incident', title: 'Your emergency' });
     return m;
-  }, [hazards, showHazards, t.waypoints, drone, isActive, incident]);
+  }, [hazards, showHazards, t.waypoints, drone, isActive, incident, help.enabled, help.places]);
 
   const circles = useMemo(
     () => (showHazards ? hazards.map((h) => ({ id: `c${h.id}`, lat: h.lat, lng: h.lng, radiusM: h.radiusM || 300, color: severityColor[h.severity] })) : []),
@@ -44,17 +49,19 @@ export default function MapScreen() {
 
   const polylines = useMemo(() => {
     const p = [];
-    if (t.route.length > 1) {
-      p.push({ id: 'corridor', coords: t.route, color: 'rgba(244,140,37,0.18)', width: 26 });
-      p.push({ id: 'route', coords: t.route, color: colors.primary, width: 5, dashed: t.status !== 'tracking' });
+    if (t.routedPath.length > 1) {
+      p.push({ id: 'corridor', coords: t.routedPath, color: 'rgba(244,140,37,0.18)', width: 26 });
+      p.push({ id: 'route', coords: t.routedPath, color: colors.primary, width: 5, dashed: t.status !== 'tracking' });
     }
     if (t.trail.length > 1) p.push({ id: 'trail', coords: t.trail, color: colors.blue, width: 4 });
     return p;
-  }, [t.route, t.trail, t.status]);
+  }, [t.routedPath, t.trail, t.status]);
 
   const canPlan = t.status !== 'tracking';
-  const dest = t.waypoints[t.waypoints.length - 1];
-  const toDest = dest ? haversineM(location, dest) : null;
+  const info = t.routeInfo;
+  const toDest = t.routedPath.length ? remainingPathM(location, t.routedPath) : null;
+  const paceMps = info && info.durationS > 0 ? info.distanceM / info.durationS : 1.35;
+  const etaS = toDest != null ? toDest / paceMps : null;
   const offFor = t.deviation.since ? Math.floor((Date.now() - t.deviation.since) / 1000) : 0;
 
   return (
@@ -96,20 +103,25 @@ export default function MapScreen() {
       </SafeAreaView>
 
       {/* Floating controls */}
-      <View className="absolute right-4 gap-3" style={{ bottom: t.status === 'idle' ? 200 : 290 }}>
+      <View className="absolute right-4 gap-3" style={{ bottom: sheetH + 16 }}>
         <MapFab onPress={() => setFollow(true)} active={follow} icon={Locate} label="Recenter" />
         <MapFab onPress={() => { setShowHazards((v) => !v); refresh(); }} active={showHazards} icon={Layers} label="Toggle hazards" />
+        <MapFab onPress={help.toggle} active={help.enabled} icon={Hospital} label="Nearby help" />
         <MapFab onPress={() => setReportOpen(true)} icon={Megaphone} label="Report hazard" />
       </View>
 
       {/* Bottom sheet */}
-      <View className="absolute left-0 right-0 bottom-0 bg-bg-base rounded-t-[32px] px-5 pt-3 pb-5" style={raised(1)}>
+      <View
+        className="absolute left-0 right-0 bottom-0 bg-bg-base rounded-t-[32px] px-5 pt-3 pb-5"
+        style={raised(1)}
+        onLayout={(e) => setSheetH(Math.round(e.nativeEvent.layout.height))}
+      >
         <View className="w-12 h-1.5 rounded-full bg-slate-300 self-center mb-4" />
         {t.status === 'tracking' ? (
           <>
             <View className="flex-row gap-3 mb-4">
               <Stat icon={Timer} label="Time left" value={fmt(t.remainingS)} color={t.remainingS < 120 ? colors.red : colors.primary} />
-              <Stat icon={Route} label="To destination" value={formatDistance(toDest)} color={colors.blue} />
+              <Stat icon={Route} label="To destination" value={formatDistance(toDest)} color={colors.blue} caption={etaS != null ? `~${formatDuration(etaS)} walk` : null} />
             </View>
             <View className="flex-row gap-3">
               <View className="flex-1"><Button title="Stop" variant="ghost" icon={Square} onPress={t.stop} /></View>
@@ -129,7 +141,7 @@ export default function MapScreen() {
               <View>
                 <Text className="text-lg font-extrabold text-slate-800">Route controls</Text>
                 <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {t.waypoints.length} stop{t.waypoints.length > 1 ? 's' : ''} · {formatDistance(pathLengthM(t.route))}
+                  {t.waypoints.length} stop{t.waypoints.length > 1 ? 's' : ''}
                 </Text>
               </View>
               <View className="flex-row gap-2">
@@ -137,6 +149,7 @@ export default function MapScreen() {
                 <MapFab onPress={t.clear} icon={Trash2} label="Clear" small />
               </View>
             </View>
+            <RouteSummary info={info} onUseEta={(min) => t.setDurationMin(min)} />
             <Text className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 mb-2">Time limit</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4 -mx-1">
               {DURATIONS.map((d) => (
@@ -149,6 +162,8 @@ export default function MapScreen() {
             </ScrollView>
             <Button title="Start tracking" icon={Play} size="lg" onPress={() => { t.start(); setFollow(true); }} />
           </>
+        ) : help.enabled ? (
+          <NearbyHelpList help={help} location={location} />
         ) : (
           <>
             <Text className="text-lg font-extrabold text-slate-800">Nearby alerts</Text>
@@ -179,7 +194,7 @@ export default function MapScreen() {
   );
 }
 
-function Stat({ icon: Icon, label, value, color }) {
+function Stat({ icon: Icon, label, value, color, caption }) {
   return (
     <View className="flex-1 rounded-2xl bg-bg-base border border-white p-4" style={raised(0.5)}>
       <View className="flex-row items-center gap-1.5 mb-1">
@@ -187,7 +202,132 @@ function Stat({ icon: Icon, label, value, color }) {
         <Text className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">{label}</Text>
       </View>
       <Text className="text-2xl font-black" style={{ color, fontVariant: ['tabular-nums'] }}>{value}</Text>
+      {caption ? <Text className="text-[11px] font-bold text-slate-400 mt-0.5">{caption}</Text> : null}
     </View>
+  );
+}
+
+// Walking distance + ETA of the planned route (OSRM, or a straight-line estimate when offline).
+function RouteSummary({ info, onUseEta }) {
+  if (!info) return null;
+  const etaMin = Math.max(1, Math.round(info.durationS / 60));
+  // Suggest a time limit with ~40% slack, rounded up to 5 min.
+  const suggested = Math.min(180, Math.max(10, Math.ceil((etaMin * 1.4) / 5) * 5));
+  return (
+    <View className="flex-row items-center gap-3 rounded-2xl p-3.5 mb-4" style={inset()}>
+      <View className="w-10 h-10 rounded-full bg-bg-base items-center justify-center border border-white" style={raised(0.4)}>
+        {info.loading ? <ActivityIndicator color={colors.primary} size="small" /> : <Footprints color={colors.primary} size={18} />}
+      </View>
+      <View className="flex-1">
+        <Text className="text-base font-extrabold text-slate-800" style={{ fontVariant: ['tabular-nums'] }}>
+          {formatDistance(info.distanceM)} · {formatDuration(info.durationS)} walk
+        </Text>
+        <Text className="text-[11px] font-semibold text-slate-400">
+          {info.loading ? 'Finding a walking route…' : info.source === 'straight' ? 'Straight-line estimate · routing unavailable' : 'Walking route via OpenStreetMap'}
+        </Text>
+      </View>
+      {!info.loading && (
+        <PressScale onPress={() => onUseEta(suggested)} accessibilityLabel={`Set time limit to ${suggested} minutes`}>
+          <View className="px-3 h-9 rounded-xl bg-bg-base border border-white items-center justify-center" style={raised(0.4)}>
+            <Text className="text-[11px] font-extrabold text-primary">Use {suggested} min</Text>
+          </View>
+        </PressScale>
+      )}
+    </View>
+  );
+}
+
+const PLACE_COLOR = { hospital: colors.red, police: colors.blue };
+const PLACE_ICON = { hospital: Hospital, police: Shield };
+
+// Toggleable nearest hospitals / police stations (OpenStreetMap Overpass, cached 10 min).
+function useNearbyHelp(location) {
+  const [enabled, setEnabled] = useState(false);
+  const [places, setPlaces] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const locRef = React.useRef(location);
+  locRef.current = location;
+
+  const load = useCallback(async (force = false) => {
+    setLoading(true);
+    setError(null);
+    try {
+      setPlaces(await fetchNearbyHelp(locRef.current, { force }));
+    } catch {
+      setError('Could not reach OpenStreetMap. Check your connection and retry.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // (Re)load when switched on and when the user has moved ~100 m (the fetcher's cache absorbs small moves).
+  const key = `${location.lat.toFixed(3)},${location.lng.toFixed(3)}`;
+  useEffect(() => {
+    if (enabled) load();
+  }, [enabled, key, load]);
+
+  const toggle = useCallback(() => setEnabled((v) => !v), []);
+  const reload = useCallback(() => load(true), [load]);
+  return { enabled, toggle, places, loading, error, reload };
+}
+
+function NearbyHelpList({ help, location }) {
+  const open = (url) => Linking.openURL(url).catch(() => {});
+  return (
+    <>
+      <View className="flex-row items-center justify-between">
+        <Text className="text-lg font-extrabold text-slate-800">Nearby help</Text>
+        <PressScale onPress={help.reload} accessibilityLabel="Refresh nearby help">
+          {help.loading ? <ActivityIndicator color={colors.primary} size="small" /> : <RefreshCw color={colors.muted} size={16} />}
+        </PressScale>
+      </View>
+      <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Hospitals & police · 3 km</Text>
+      {help.loading && !help.places.length ? (
+        <View className="flex-row items-center gap-2 py-3">
+          <ActivityIndicator color={colors.primary} />
+          <Text className="text-sm text-slate-400">Searching OpenStreetMap…</Text>
+        </View>
+      ) : help.error && !help.places.length ? (
+        <Text className="text-sm text-slate-400">{help.error}</Text>
+      ) : help.places.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1">
+          {help.places.slice(0, 12).map((p) => {
+            const Icon = PLACE_ICON[p.kind];
+            const c = PLACE_COLOR[p.kind];
+            return (
+              <View key={p.id} className="mx-1 w-60 rounded-2xl bg-bg-base border border-white p-3" style={raised(0.4)}>
+                <View className="flex-row items-center gap-2 mb-1">
+                  <Icon color={c} size={16} />
+                  <Text className="text-[10px] font-extrabold uppercase tracking-wider" style={{ color: c }}>
+                    {PLACE_LABEL[p.kind]} · {formatDistance(p.distanceM)}
+                  </Text>
+                </View>
+                <Text className="text-sm font-bold text-slate-700 mb-2.5" numberOfLines={1}>{p.name}</Text>
+                <View className="flex-row gap-2">
+                  <PressScale onPress={() => open(directionsUrl(p, location))} style={{ flex: 1 }} accessibilityLabel={`Directions to ${p.name}`}>
+                    <View className="h-9 rounded-xl bg-primary flex-row items-center justify-center gap-1.5" style={raised(0.3)}>
+                      <Navigation color="#fff" size={13} />
+                      <Text className="text-[11px] font-extrabold text-white uppercase tracking-wide">Directions</Text>
+                    </View>
+                  </PressScale>
+                  {p.phone ? (
+                    <PressScale onPress={() => open(telUrl(p.phone))} accessibilityLabel={`Call ${p.name}`}>
+                      <View className="h-9 px-3 rounded-xl bg-bg-base border border-white flex-row items-center justify-center gap-1.5" style={raised(0.3)}>
+                        <Phone color={colors.primary} size={13} />
+                        <Text className="text-[11px] font-extrabold text-primary uppercase tracking-wide">Call</Text>
+                      </View>
+                    </PressScale>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      ) : (
+        <Text className="text-sm text-slate-400">No hospitals or police stations mapped within 3 km.</Text>
+      )}
+    </>
   );
 }
 

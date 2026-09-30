@@ -28,6 +28,45 @@ export function distanceToPathM(p, path) {
   return min;
 }
 
+// Nearest point on a path: { index (segment start), t (0..1 along it), distanceM }.
+export function nearestOnPath(p, path) {
+  if (!path?.length) return null;
+  if (path.length === 1) return { index: 0, t: 0, distanceM: haversineM(p, path[0]) };
+  let best = { index: 0, t: 0, distanceM: Infinity };
+  const kx = Math.cos(toRad(p.lat)) * R;
+  const px = toRad(p.lng) * kx, py = toRad(p.lat) * R;
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i], b = path[i + 1];
+    const ax = toRad(a.lng) * kx, ay = toRad(a.lat) * R;
+    const dx = toRad(b.lng) * kx - ax, dy = toRad(b.lat) * R - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+    const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+    if (d < best.distanceM) best = { index: i, t, distanceM: d };
+  }
+  return best;
+}
+
+// Distance left along `path` from the point on it closest to p (plus the hop back onto the path).
+export function remainingPathM(p, path) {
+  if (!path?.length) return Infinity;
+  const n = nearestOnPath(p, path);
+  if (path.length === 1) return n.distanceM;
+  const a = path[n.index], b = path[n.index + 1];
+  let total = n.distanceM + haversineM(a, b) * (1 - n.t);
+  for (let i = n.index + 1; i < path.length - 1; i++) total += haversineM(path[i], path[i + 1]);
+  return total;
+}
+
+export function formatDuration(s) {
+  if (!Number.isFinite(s)) return '—';
+  const min = Math.max(1, Math.round(s / 60));
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
 export function checkCorridor(p, path, corridorM = 150) {
   const distanceM = distanceToPathM(p, path);
   return { inside: distanceM <= corridorM, distanceM };
