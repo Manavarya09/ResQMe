@@ -5,7 +5,7 @@ const db = require('../src/db');
 const drones = require('../src/services/drones');
 const { signToken, rowToUser } = require('../src/auth');
 
-const TABLES = ['audit_log', 'mfa_recovery_codes', 'incident_events', 'incidents', 'share_tokens', 'contacts', 'medical_ids', 'hazards', 'drones', 'users'];
+const TABLES = ['audit_log', 'location_shares', 'mfa_recovery_codes', 'incident_events', 'incidents', 'share_tokens', 'contacts', 'medical_ids', 'hazards', 'drones', 'users'];
 
 async function resetDb() {
   await db.migrate();

@@ -62,7 +62,9 @@ function createApp(options = {}) {
   app.use('/api', require('./routes/contacts'));
   app.use('/api', require('./routes/incidents'));
   app.use('/api', require('./routes/misc'));
+  app.use('/api', require('./routes/locationShares').api);
   app.use('/', require('./routes/medical').page);
+  app.use('/', require('./routes/locationShares').page);
 
   app.use('/dashboard', express.static(DASHBOARD_DIR, { index: 'index.html', maxAge: 0 }));
   app.get('/', (req, res) => res.redirect('/dashboard/'));

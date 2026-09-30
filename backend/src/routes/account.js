@@ -21,7 +21,7 @@ router.get('/me/audit', requireAuth, ah(async (req, res) => {
 
 router.get('/me/export', requireAuth, ah(async (req, res) => {
   const uid = req.user.id;
-  const [medicalId, contacts, incidentList, auditEntries, shares, reported, mfaCodes] = await Promise.all([
+  const [medicalId, contacts, incidentList, auditEntries, shares, reported, mfaCodes, locShares] = await Promise.all([
     getMedicalId(uid),
     listContacts(uid),
     incidents.listIncidents({ userId: uid, limit: 10000 }),
@@ -29,6 +29,7 @@ router.get('/me/export', requireAuth, ah(async (req, res) => {
     db.query('SELECT created_at, expires_at FROM share_tokens WHERE user_id = $1 ORDER BY created_at DESC', [uid]),
     db.query('SELECT * FROM hazards WHERE user_id = $1 ORDER BY created_at DESC', [uid]),
     db.query('SELECT count(*) FILTER (WHERE used_at IS NULL)::int AS unused, count(*)::int AS total FROM mfa_recovery_codes WHERE user_id = $1', [uid]),
+    db.query('SELECT * FROM location_shares WHERE user_id = $1 ORDER BY created_at DESC', [uid]),
   ]);
   const withEvents = await Promise.all(incidentList.map(async (inc) => ({ ...inc, events: await incidents.getEvents(inc.id) })));
   await audit.fromReq(req, 'data_exported');
@@ -48,6 +49,10 @@ router.get('/me/export', requireAuth, ah(async (req, res) => {
     contacts,
     incidents: withEvents,
     medicalShareLinks: shares.rows.map((r) => ({ createdAt: toIso(r.created_at), expiresAt: toIso(r.expires_at) })),
+    liveLocationShares: locShares.rows.map((r) => ({
+      incidentId: r.incident_id, lastLat: r.last_lat, lastLng: r.last_lng, updatedAt: toIso(r.updated_at),
+      createdAt: toIso(r.created_at), expiresAt: toIso(r.expires_at), revokedAt: toIso(r.revoked_at),
+    })),
     hazardsReported: reported.rows.map(hazards.rowToHazard),
     audit: auditEntries,
   });

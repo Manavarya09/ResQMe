@@ -29,6 +29,19 @@ function init(httpServer) {
     const { id, role } = socket.data.user;
     socket.join(`user:${id}`);
     if (role === 'responder') socket.join('responders');
+    // viewers holding a live-location link can follow it in real time (the token is the capability)
+    socket.on('share:watch', async (payload, ack) => {
+      const reply = typeof ack === 'function' ? ack : () => {};
+      try {
+        const shares = require('./locationShares');
+        const row = await shares.findByToken(payload && payload.token);
+        if (!row || !shares.isActive(row)) return reply({ ok: false });
+        socket.join(`share:${row.id}`);
+        return reply({ ok: true, shareId: row.id });
+      } catch {
+        return reply({ ok: false });
+      }
+    });
     socket.emit('hello', { userId: id, role });
   });
   return io;
@@ -45,6 +58,7 @@ const emitIncidentNew = (incident) => toRooms(['responders'], 'incident:new', in
 const emitIncidentUpdated = (incident) => toRooms(['responders', `user:${incident.userId}`], 'incident:updated', incident);
 const emitIncidentLocation = (ownerId, payload) => toRooms(['responders', `user:${ownerId}`], 'incident:location', payload);
 const emitDroneUpdate = (drone, ownerId) => toRooms(['responders', ownerId && `user:${ownerId}`], 'drone:update', drone);
+const emitShareLocation = (shareId, payload) => toRooms([`share:${shareId}`], 'share:location', payload);
 const emitHazardNew = (hazard) => { if (io) io.emit('hazard:new', hazard); };
 
 /** Drop every live socket of a user (after logout-all / password change / account deletion). */
@@ -61,6 +75,6 @@ async function close() {
 }
 
 module.exports = {
-  init, close, disconnectUser, emitIncidentNew, emitIncidentUpdated, emitIncidentLocation, emitDroneUpdate, emitHazardNew,
+  init, close, disconnectUser, emitIncidentNew, emitIncidentUpdated, emitIncidentLocation, emitDroneUpdate, emitHazardNew, emitShareLocation,
   get io() { return io; },
 };
