@@ -4,7 +4,7 @@ import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Siren, Map, Bot, HeartPulse, Settings } from 'lucide-react-native';
+import { Siren, Map, Bot, HeartPulse, Settings, ListChecks } from 'lucide-react-native';
 
 import { navigationRef } from './src/navigation/ref';
 import { useAuth } from './src/context/AuthContext';
@@ -28,6 +28,11 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import IncidentDetailScreen from './src/screens/IncidentDetailScreen';
 import SafetyToolsScreen from './src/screens/SafetyToolsScreen';
 import { useShakeSOS } from './src/hooks/useShakeSOS';
+import { ResponderIncidentsProvider } from './src/hooks/useResponderIncidents';
+import QueueScreen from './src/screens/responder/QueueScreen';
+import ResponderMapScreen from './src/screens/responder/ResponderMapScreen';
+import ResponderIncidentScreen from './src/screens/responder/ResponderIncidentScreen';
+import NewIncidentBanner from './src/screens/responder/NewIncidentBanner';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -42,9 +47,33 @@ const TABS = [
   { name: 'Settings', component: SettingsScreen, label: 'Settings', icon: Settings },
 ];
 
-function Tabs() {
-  // Tabs stay mounted for the whole signed-in session, so shake-to-SOS is always listening.
+// Responders get an operations console instead of the personal-safety tabs.
+const RESPONDER_TABS = [
+  { name: 'Queue', component: QueueScreen, label: 'Queue', icon: ListChecks },
+  { name: 'ResponderMap', component: ResponderMapScreen, label: 'Map', icon: Map },
+  { name: 'Settings', component: SettingsScreen, label: 'Settings', icon: Settings },
+];
+
+function ShakeListener() {
+  // Mounted with the user tabs for the whole signed-in session, so shake-to-SOS is always listening.
   useShakeSOS();
+  return null;
+}
+
+function Tabs() {
+  return (
+    <>
+      <ShakeListener />
+      <TabBar tabs={TABS} />
+    </>
+  );
+}
+
+function ResponderTabs() {
+  return <TabBar tabs={RESPONDER_TABS} />;
+}
+
+function TabBar({ tabs }) {
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
@@ -64,7 +93,7 @@ function Tabs() {
         },
       }}
     >
-      {TABS.map(({ name, component, label, icon: Icon }) => (
+      {tabs.map(({ name, component, label, icon: Icon }) => (
         <Tab.Screen
           key={name}
           name={name}
@@ -77,7 +106,8 @@ function Tabs() {
 }
 
 export default function Navigation() {
-  const { token, ready, needsOnboarding } = useAuth();
+  const { token, ready, needsOnboarding, user } = useAuth();
+  const isResponder = !!token && user?.role === 'responder';
   if (!ready) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.base }}>
@@ -85,12 +115,12 @@ export default function Navigation() {
       </View>
     );
   }
-  return (
+  const tree = (
     <NavigationContainer ref={navigationRef} theme={theme}>
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.base } }}>
         {!token ? (
           <Stack.Screen name="Auth" component={AuthScreen} />
-        ) : needsOnboarding ? (
+        ) : needsOnboarding && !isResponder ? (
           <>
             <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ animation: 'fade' }} />
             {/* An SOS or crash during onboarding must still open the incident screen. */}
@@ -98,7 +128,16 @@ export default function Navigation() {
           </>
         ) : (
           <>
-            <Stack.Screen name="Tabs" component={Tabs} />
+            {isResponder ? (
+              <>
+                <Stack.Screen name="ResponderTabs" component={ResponderTabs} />
+                <Stack.Screen name="ResponderIncident" component={ResponderIncidentScreen} options={{ animation: 'slide_from_right' }} />
+                {/* Settings links to the Medical ID, which is a tab for regular users */}
+                <Stack.Screen name="Medical" component={MedicalIDScreen} options={{ animation: 'slide_from_right' }} />
+              </>
+            ) : (
+              <Stack.Screen name="Tabs" component={Tabs} />
+            )}
             <Stack.Screen name="Incident" component={IncidentScreen} options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="Training" component={TrainingScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="TrainingDetail" component={TrainingDetailScreen} options={{ animation: 'slide_from_right' }} />
@@ -112,6 +151,9 @@ export default function Navigation() {
           </>
         )}
       </Stack.Navigator>
+      {isResponder ? <NewIncidentBanner /> : null}
     </NavigationContainer>
   );
+  // one live queue (and socket subscription) for the whole responder session
+  return isResponder ? <ResponderIncidentsProvider key={user.id}>{tree}</ResponderIncidentsProvider> : tree;
 }
