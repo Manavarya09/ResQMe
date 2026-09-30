@@ -4,7 +4,7 @@ import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import { markerStyle } from './markers';
 
 // Unified map API shared with RMap.web.js:
-//   center {lat,lng}, user {lat,lng,accuracy}, markers [{id,lat,lng,kind,color,title}],
+//   center {lat,lng}, user {lat,lng,accuracy}, markers [{id,lat,lng,kind,color,title,onPress?}],
 //   circles [{id,lat,lng,radiusM,color}], polylines [{id,coords,color,width,dashed}], onPress({lat,lng})
 export default function RMap({ center, user, markers = [], circles = [], polylines = [], onPress, follow = false, zoom = 15, style }) {
   const ref = useRef(null);
@@ -43,7 +43,7 @@ export default function RMap({ center, user, markers = [], circles = [], polylin
         {markers.map((m) => {
           const s = markerStyle(m);
           return (
-            <Marker key={m.id} coordinate={{ latitude: m.lat, longitude: m.lng }} title={m.title} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <Marker key={m.id} coordinate={{ latitude: m.lat, longitude: m.lng }} title={m.title} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onCalloutPress={m.onPress} onPress={m.onPress && !m.title ? m.onPress : undefined}>
               <View style={{ width: s.size, height: s.size, borderRadius: s.size / 2, backgroundColor: s.bg, borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', elevation: 4 }}>
                 {s.inner ? <View style={{ width: s.size / 3, height: s.size / 3, borderRadius: s.size, backgroundColor: '#fff' }} /> : null}
               </View>

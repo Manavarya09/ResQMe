@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, ScrollView, Platform } from 'react-native';
-import { Siren, PhoneIncoming, Share2, ChevronRight, Vibrate, X, MapPin } from 'lucide-react-native';
+import { Siren, PhoneIncoming, Share2, ChevronRight, Vibrate, X, Radio, Square } from 'lucide-react-native';
 import Text from '../components/Text';
-import { Screen, Header, Card, Field, Button, SectionLabel, PressScale, Pill } from '../components/ui';
+import { Screen, Header, Card, Inset, Field, Button, SectionLabel, PressScale, Pill } from '../components/ui';
 import SirenStrobe from '../components/safety/SirenStrobe';
 import FakeCall from '../components/safety/FakeCall';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
-import { shareLocation } from '../lib/share';
+import { useLocationShare } from '../hooks/useLocationShare';
+import { SHARE_DURATIONS, formatTimeLeft, formatUntil } from '../lib/liveShare';
 import { colors, raised } from '../theme';
 
 const DELAYS = [
@@ -18,15 +19,17 @@ const DELAYS = [
 ];
 
 export default function SafetyToolsScreen({ navigation }) {
-  const { user, settings } = useAuth();
-  const { location, hasFix } = useLocation();
+  const { settings } = useAuth();
+  const { hasFix } = useLocation();
   const [sirenOn, setSirenOn] = useState(false);
   const [callerName, setCallerName] = useState('Mom');
   const [delay, setDelay] = useState(10);
   const [callAt, setCallAt] = useState(null); // timestamp when the fake call rings
   const [ringing, setRinging] = useState(false);
   const [now, setNow] = useState(Date.now());
-  const [shareState, setShareState] = useState(null); // null | 'busy' | 'shared' | 'copied' | 'error'
+  const [shareState, setShareState] = useState(null); // null | 'shared' | 'copied' | 'error'
+  const [duration, setDuration] = useState('1h');
+  const live = useLocationShare();
   const callerRef = useRef('Mom');
 
   // Countdown until the scheduled fake call.
@@ -53,14 +56,16 @@ export default function SafetyToolsScreen({ navigation }) {
     setCallAt(Date.now() + delay * 1000);
   };
 
-  const share = async () => {
-    setShareState('busy');
-    try {
-      const res = await shareLocation(location, { name: user?.name });
-      setShareState(res === 'copied' ? 'copied' : res ? 'shared' : null);
-    } catch {
-      setShareState('error');
-    }
+  const startSharing = async () => {
+    setShareState(null);
+    const choice = SHARE_DURATIONS.find((d) => d.key === duration) || SHARE_DURATIONS[1];
+    const res = await live.start({ minutes: choice.minutes, untilStopped: !!choice.untilStopped });
+    if (res) setShareState(res.result === 'copied' ? 'copied' : res.result ? 'shared' : null);
+  };
+
+  const shareAgain = async (s) => {
+    const res = await live.share(s);
+    setShareState(res === 'copied' ? 'copied' : res ? 'shared' : null);
   };
 
   const callIn = callAt ? Math.max(0, Math.ceil((callAt - now) / 1000)) : 0;
@@ -140,25 +145,75 @@ export default function SafetyToolsScreen({ navigation }) {
           ) : null}
         </Card>
 
-        {/* Share location */}
-        <SectionLabel right={!hasFix ? <Pill label="Approx." color={colors.primary} /> : null}>Share my location</SectionLabel>
+        {/* Live location */}
+        <SectionLabel right={live.primary ? <Pill label="Live" color={colors.primary} /> : !hasFix ? <Pill label="Approx." color={colors.primary} /> : null}>
+          Share live location
+        </SectionLabel>
         <Card>
           <View className="flex-row items-center gap-3 mb-4">
             <View className="w-12 h-12 rounded-2xl items-center justify-center" style={{ backgroundColor: `${colors.primary}1a` }}>
-              <MapPin color={colors.primary} size={22} />
+              <Radio color={colors.primary} size={22} />
             </View>
             <View className="flex-1">
-              <Text className="text-[15px] font-extrabold text-slate-700">Send a map link</Text>
-              <Text className="text-xs text-slate-400 font-medium mt-0.5" style={{ fontVariant: ['tabular-nums'] }}>
-                {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
-                {Number.isFinite(location.accuracy) ? `  ·  ±${Math.round(location.accuracy)} m` : ''}
+              <Text className="text-[15px] font-extrabold text-slate-700">
+                {live.primary ? 'You are sharing your location' : 'Send a live map link'}
+              </Text>
+              <Text className="text-xs text-slate-400 font-medium mt-0.5">
+                {live.primary
+                  ? 'Anyone with the link sees where you are, updated every 15 seconds.'
+                  : 'Friends open the link in any browser and follow you on a map until it ends.'}
               </Text>
             </View>
           </View>
-          <Button title="Share location" variant="ghost" icon={Share2} onPress={share} loading={shareState === 'busy'} />
-          {shareState === 'copied' || shareState === 'shared' || shareState === 'error' ? (
-            <Text className={`text-[11px] font-bold mt-3 px-1 ${shareState === 'error' ? 'text-red-500' : 'text-green-600'}`}>
-              {shareState === 'copied' ? 'Link copied to clipboard.' : shareState === 'shared' ? 'Location shared.' : 'Could not open the share sheet.'}
+
+          {live.shares.length ? (
+            live.shares.map((s, i) => (
+              <View key={s.id} className={i ? 'mt-4 pt-4 border-t border-slate-200/70' : ''}>
+                <Inset className="flex-row items-center gap-3 py-3">
+                  <View className="w-2.5 h-2.5 rounded-full bg-primary" />
+                  <View className="flex-1">
+                    <Text className="text-sm font-extrabold text-slate-700" style={{ fontVariant: ['tabular-nums'] }}>
+                      {s.untilStopped ? 'Until you stop' : formatTimeLeft(s.expiresAt, live.now)}
+                    </Text>
+                    <Text className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                      {s.incidentId ? 'Emergency link' : 'Personal link'} · ends {formatUntil(s.expiresAt)}
+                    </Text>
+                  </View>
+                </Inset>
+                <View className="flex-row gap-3 mt-4">
+                  <View className="flex-1">
+                    <Button title="Share" variant="ghost" icon={Share2} onPress={() => shareAgain(s)} loading={live.busy === 'share'} />
+                  </View>
+                  <View className="flex-1">
+                    <Button title="Stop" variant="danger" icon={Square} onPress={() => live.stop(s.id)} loading={live.busy === 'stop'} />
+                  </View>
+                </View>
+              </View>
+            ))
+          ) : (
+            <>
+              <Text className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400 mb-2 ml-1">Share for</Text>
+              <View className="flex-row gap-2 mb-5">
+                {SHARE_DURATIONS.map((d) => (
+                  <PressScale key={d.key} onPress={() => setDuration(d.key)} style={{ flex: d.untilStopped ? 1.6 : 1 }} accessibilityLabel={`Share for ${d.label}`}>
+                    <View className={`h-10 rounded-xl items-center justify-center px-1 ${duration === d.key ? 'bg-primary' : 'bg-bg-base border border-white'}`} style={raised(0.4)}>
+                      <Text className={`text-[13px] font-extrabold ${duration === d.key ? 'text-white' : 'text-slate-500'}`} numberOfLines={1}>{d.label}</Text>
+                    </View>
+                  </PressScale>
+                ))}
+              </View>
+              <Button title="Share live location" icon={Share2} onPress={startSharing} loading={live.busy === 'start' || live.busy === 'share'} />
+              {duration === 'stop' ? (
+                <Text className="text-[11px] text-slate-400 font-medium mt-3 px-1">For your safety the link still ends after 24 hours.</Text>
+              ) : null}
+            </>
+          )}
+
+          {live.error ? (
+            <Text className="text-[11px] font-bold mt-3 px-1 text-red-500">{live.error}</Text>
+          ) : shareState === 'copied' || shareState === 'shared' ? (
+            <Text className="text-[11px] font-bold mt-3 px-1 text-green-600">
+              {shareState === 'copied' ? 'Link copied to clipboard.' : 'Link shared.'}
             </Text>
           ) : null}
         </Card>

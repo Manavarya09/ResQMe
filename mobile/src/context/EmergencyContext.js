@@ -5,11 +5,13 @@ import * as SMS from 'expo-sms';
 import { api } from '../lib/api';
 import { getJSON, setJSON, removeItem } from '../lib/storage';
 import { createRetryQueue, isRetryableError } from '../lib/retryQueue';
-import { getSocket } from '../lib/socket';
+import { onSocketEvent } from '../lib/socket';
 import { mapsLink } from '../lib/geo';
 import { analyzeWindow, createImpactDetector } from '../lib/impactDetector';
 import { startMotionStream, syntheticFall } from '../lib/sensors';
 import { ESCALATION_SECONDS, LIVE_LOCATION_INTERVAL_MS } from '../config';
+import { EMERGENCY_SHARE_MINUTES } from '../lib/liveShare';
+import { useLocationShareDriver, startLiveShare, pushShareLocation, stopSharesForIncident } from '../hooks/useLocationShare';
 import { useAuth } from './AuthContext';
 import { useLocation } from './LocationContext';
 import { navigate } from '../navigation/ref';
@@ -36,6 +38,8 @@ const EmergencyContext = createContext(null);
 export function EmergencyProvider({ children }) {
   const { user, settings, token } = useAuth();
   const { location } = useLocation();
+  // background push loop for live location links (one per signed-in session)
+  useLocationShareDriver();
   const locationRef = useRef(location);
   locationRef.current = location;
 
@@ -52,7 +56,9 @@ export function EmergencyProvider({ children }) {
   incidentRef.current = incident;
 
   // ---------- escalation ----------
-  const notifyContacts = useCallback(async (trigger, created) => {
+  // liveUrl: the /t/<token> live-location page; falls back to a static maps link when the
+  // server could not create one (offline, consent off).
+  const notifyContacts = useCallback(async (trigger, created, liveUrl) => {
     if (Platform.OS === 'web') return;
     try {
       if (!(await SMS.isAvailableAsync())) return;
@@ -60,8 +66,9 @@ export function EmergencyProvider({ children }) {
       const phones = contacts.map((c) => c.phone).filter(Boolean);
       if (!phones.length) return;
       const loc = locationRef.current;
-      const msg = `🚨 EMERGENCY — ${user?.name || 'A ResQMe user'} may need help (${TRIGGER_LABEL[trigger]}). ` +
-        `Live location: ${mapsLink(loc)} . Emergency services have been alerted via ResQMe.`;
+      const where = liveUrl ? `Live location (updates for 4 h): ${liveUrl}` : `Location: ${mapsLink(loc)}`;
+      const msg = `EMERGENCY: ${user?.name || 'A ResQMe user'} may need help (${TRIGGER_LABEL[trigger]}). ` +
+        `${where} . Emergency services have been alerted via ResQMe.`;
       await SMS.sendSMSAsync(phones, msg);
     } catch {}
   }, [user]);
@@ -106,8 +113,17 @@ export function EmergencyProvider({ children }) {
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
     navigate('Incident');
-    notifyContacts(trigger, created);
-  }, [settings.shareMedical, notifyContacts, user?.id]);
+    // A 4-hour live link tied to the incident replaces the static maps link in the SMS. Consent-gated
+    // like the incident location stream; short timeout so the SMS composer is never held up for long.
+    let liveUrl = null;
+    if (created?.id && !created.offline && settings.shareLocation) {
+      try {
+        const share = await startLiveShare({ durationMinutes: EMERGENCY_SHARE_MINUTES, incidentId: created.id, location: loc, timeoutMs: 6000 });
+        liveUrl = share.absoluteUrl;
+      } catch {}
+    }
+    notifyContacts(trigger, created, liveUrl);
+  }, [settings.shareMedical, settings.shareLocation, notifyContacts, user?.id]);
 
   const requestEmergency = useCallback((trigger, extra = {}) => {
     if (incidentRef.current && ACTIVE.includes(incidentRef.current.status)) {
@@ -138,7 +154,11 @@ export function EmergencyProvider({ children }) {
   const cancelIncident = useCallback(async () => {
     const cur = incidentRef.current;
     if (cur?.id) {
-      try { setIncident(await api.cancelIncident(cur.id)); } catch (e) { setError(e.message); }
+      try {
+        setIncident(await api.cancelIncident(cur.id));
+        // false alarm: stop the emergency live link too
+        stopSharesForIncident(cur.id);
+      } catch (e) { setError(e.message); }
     } else {
       // Offline incident: the user is safe, so drop the queued alert instead of delivering it later.
       setIncident(null);
@@ -216,7 +236,8 @@ export function EmergencyProvider({ children }) {
     if (!token) { setIncident(null); return; }
     api.incidents()
       .then((list) => {
-        const active = list?.find((i) => ACTIVE.includes(i.status));
+        // responders receive every incident here — only restore the signed-in user's own
+        const active = list?.find((i) => ACTIVE.includes(i.status) && (!user?.id || i.userId === user.id));
         if (!active) return;
         // A live server incident supersedes any queued offline alert (it most likely got through).
         setQueued(null);
@@ -224,12 +245,10 @@ export function EmergencyProvider({ children }) {
         setIncident((cur) => (cur && !cur.offline ? cur : active));
       })
       .catch(() => {});
-  }, [token]);
+  }, [token, user?.id]);
 
   // Real-time updates from responders and the drone simulator.
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
     const onUpdate = (inc) => {
       if (incidentRef.current?.id === inc.id) {
         setIncident(inc);
@@ -239,13 +258,13 @@ export function EmergencyProvider({ children }) {
     const onDrone = (d) => {
       if (d.incidentId && d.incidentId === incidentRef.current?.id) setDrone(d);
     };
-    socket.on('incident:updated', onUpdate);
-    socket.on('drone:update', onDrone);
+    const offUpdate = onSocketEvent('incident:updated', onUpdate);
+    const offDrone = onSocketEvent('drone:update', onDrone);
     return () => {
-      socket.off('incident:updated', onUpdate);
-      socket.off('drone:update', onDrone);
+      offUpdate();
+      offDrone();
     };
-  }, [token]);
+  }, []);
 
   // Recover the assigned drone after a restart (the socket only pushes changes), and keep a slow
   // poll as a backup in case the socket drops mid-incident.
@@ -267,6 +286,8 @@ export function EmergencyProvider({ children }) {
     const send = () => {
       const l = locationRef.current;
       api.sendLocation(incident.id, { lat: l.lat, lng: l.lng }).catch(() => {});
+      // keep the linked live-location page in step (throttled; no-op without an active share)
+      pushShareLocation(l);
     };
     send();
     const id = setInterval(send, LIVE_LOCATION_INTERVAL_MS);

@@ -1,10 +1,19 @@
 import { Share, Platform } from 'react-native';
 import { mapsLink } from './geo';
+import { formatUntil } from './liveShare';
 
-// Builds the text shared by "Share my location". Swap point: when live-tracking links exist,
-// replace the body (or accept a `liveUrl` option) — callers only depend on this signature.
-export function buildShareMessage(location, { name } = {}) {
+// Builds the text shared by "Share live location". With a `liveUrl` (a ResQMe /t/<token> link) the
+// recipient gets a page that keeps updating; otherwise it falls back to a one-off maps link.
+export function buildShareMessage(location, { name, liveUrl, expiresAt, untilStopped } = {}) {
   const who = name ? `${name} is` : "I'm";
+  if (liveUrl) {
+    const until = expiresAt && !untilStopped ? ` until ${formatUntil(expiresAt)}` : '';
+    return {
+      title: 'My live location',
+      url: liveUrl,
+      message: `${who} sharing a live location with you via ResQMe${until}. Follow along here: ${liveUrl}`,
+    };
+  }
   const acc = Number.isFinite(location?.accuracy) ? ` (accurate to ~${Math.round(location.accuracy)} m)` : '';
   const url = mapsLink(location);
   return {
@@ -14,7 +23,7 @@ export function buildShareMessage(location, { name } = {}) {
   };
 }
 
-// Opens the OS share sheet. Resolves to true if the user shared (or the web fallback copied it).
+// Opens the OS share sheet. Resolves to true if the user shared (or 'copied' for the web fallback).
 export async function shareLocation(location, opts) {
   const { title, url, message } = buildShareMessage(location, opts);
   if (Platform.OS === 'web') {

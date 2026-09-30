@@ -79,6 +79,18 @@ export const api = {
   sendLocation: (id, body) => request('POST', `/api/incidents/${id}/location`, body),
   cancelIncident: (id) => request('POST', `/api/incidents/${id}/cancel`),
   requestDrone: (id) => request('POST', `/api/incidents/${id}/drone`),
+  // responder console
+  incidentsQueue: ({ status, limit = 100 } = {}) =>
+    request('GET', `/api/incidents?limit=${limit}${status ? `&status=${encodeURIComponent(status)}` : ''}`),
+  ackIncident: (id, etaMinutes) => request('POST', `/api/incidents/${id}/ack`, { etaMinutes }),
+  dispatchDrone: (id) => request('POST', `/api/incidents/${id}/drone`),
+  resolveIncident: (id) => request('POST', `/api/incidents/${id}/resolve`),
+
+  // live location sharing links (/t/<token>)
+  createLocationShare: (body, opts) => request('POST', '/api/location-shares', body, opts),
+  locationShares: () => request('GET', '/api/location-shares'),
+  pushShareLocation: (id, body) => request('POST', `/api/location-shares/${id}/location`, body),
+  stopLocationShare: (id) => request('DELETE', `/api/location-shares/${id}`),
 
   hazards: ({ lat, lng, radiusKm = 10 }) => request('GET', `/api/hazards?lat=${lat}&lng=${lng}&radiusKm=${radiusKm}`),
   reportHazard: (body) => request('POST', '/api/hazards', body),

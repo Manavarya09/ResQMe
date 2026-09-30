@@ -87,6 +87,7 @@ export default function RMap({ center, user, markers = [], circles = [], polylin
     markers.forEach((m) => {
       const mk = L.marker([m.lat, m.lng], { icon: divIcon(L, m) });
       if (m.title) mk.bindTooltip(m.title);
+      if (m.onPress) mk.on('click', () => m.onPress());
       mk.addTo(g);
     });
     if (user) L.marker([user.lat, user.lng], { icon: userIcon(L), zIndexOffset: 1000 }).addTo(g);
