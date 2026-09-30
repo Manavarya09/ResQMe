@@ -12,14 +12,12 @@ import { TrackingProvider } from './src/context/TrackingContext';
 import AppLock from './src/components/AppLock';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
-import { JetBrainsMono_500Medium, JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
     Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold,
-    JetBrainsMono_500Medium, JetBrainsMono_700Bold,
   });
   const ready = fontsLoaded || !!fontError;
   React.useEffect(() => {

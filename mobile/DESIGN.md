@@ -8,7 +8,7 @@ Polish comes from consistency, not new styles.
 - **Accent:** orange `#f48c25` (`text-primary`, `bg-primary`) for primary actions and active states.
 - **Danger:** red `#ef4444` only for SOS, critical severity and destructive actions. Green `#16a34a` for safe/success.
 - **Text:** headings `text-slate-800`, body `text-slate-600/700`, captions `text-slate-400`.
-- **Font:** Manrope everywhere (applied automatically by `src/components/Text`); JetBrains Mono via `font-mono` for timers, coordinates and IDs.
+- **Font:** Manrope everywhere (applied automatically by `src/components/Text`). Use `font-mono` only to get fixed-width digits for timers and counters — it stays Manrope, no code-editor fonts.
   Always import `Text` from `src/components/Text`, never from `react-native`.
 
 ## Type scale

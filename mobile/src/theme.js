@@ -43,7 +43,6 @@ export const fonts = {
   semibold: 'Manrope_600SemiBold',
   bold: 'Manrope_700Bold',
   heavy: 'Manrope_800ExtraBold',
-  mono: 'JetBrainsMono_500Medium',
 };
 
 // Neumorphic raised surface. Web gets a true dual (light + dark) shadow; native approximates with one.

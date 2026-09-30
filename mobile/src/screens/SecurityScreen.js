@@ -118,7 +118,7 @@ export default function SecurityScreen({ navigation }) {
               <Text className="text-sm font-bold text-slate-700 mb-2">Save these recovery codes somewhere safe. Each works once.</Text>
               <Inset className="flex-row flex-wrap gap-2 mb-3">
                 {recovery.map((c) => (
-                  <Text key={c} className="text-sm font-bold text-slate-700 w-[46%]" style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>{c}</Text>
+                  <Text key={c} className="text-sm font-bold text-slate-700 w-[46%]" style={{ fontVariant: ['tabular-nums'], letterSpacing: 0.5 }}>{c}</Text>
                 ))}
               </Inset>
               <Button title="I've saved them" icon={Copy} variant="ghost" onPress={() => setRecovery(null)} />

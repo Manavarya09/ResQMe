@@ -2,16 +2,13 @@ import React, { createContext, forwardRef, useContext } from 'react';
 import { Text as RNText, StyleSheet } from 'react-native';
 
 // Custom fonts load as one family per weight (e.g. "Manrope_800ExtraBold") and native platforms
-// ignore fontWeight for them — so this Text reads the weight (from `font-*` classes or style) and the
-// role (`font-mono`) and applies the matching font file. Nested Text inherits its parent's font
-// unless it asks for a different weight, mirroring how fontWeight cascades on the web.
+// ignore fontWeight for them — so this Text reads the weight (from `font-*` classes or style) and
+// applies the matching Manrope file. `font-mono` only switches on fixed-width digits for timers.
+// Nested Text inherits its parent's font unless it asks for a different weight, mirroring how
+// fontWeight cascades on the web.
 const MANROPE = {
   400: 'Manrope_400Regular', 500: 'Manrope_500Medium', 600: 'Manrope_600SemiBold',
   700: 'Manrope_700Bold', 800: 'Manrope_800ExtraBold', 900: 'Manrope_800ExtraBold',
-};
-const MONO = {
-  400: 'JetBrainsMono_500Medium', 500: 'JetBrainsMono_500Medium', 600: 'JetBrainsMono_700Bold',
-  700: 'JetBrainsMono_700Bold', 800: 'JetBrainsMono_700Bold', 900: 'JetBrainsMono_700Bold',
 };
 
 const CLASS_WEIGHT = {
@@ -36,7 +33,7 @@ export function resolveFont(className = '', style, parent = { role: 'body', weig
   if (flat.fontWeight != null) weight = STYLE_WEIGHT[flat.fontWeight] ?? Number(flat.fontWeight);
   weight = Math.min(900, Math.max(400, Math.round(weight / 100) * 100));
 
-  return { role, weight, fontFamily: (role === 'mono' ? MONO : MANROPE)[weight] };
+  return { role, weight, fontFamily: MANROPE[weight] };
 }
 
 export const Text = forwardRef(function Text({ className, style, ...props }, ref) {
@@ -45,7 +42,12 @@ export const Text = forwardRef(function Text({ className, style, ...props }, ref
   if (!font) return <RNText ref={ref} className={className} style={style} {...props} />;
   return (
     <FontContext.Provider value={font}>
-      <RNText ref={ref} className={className} {...props} style={[style, { fontFamily: font.fontFamily, fontWeight: 'normal' }]} />
+      <RNText
+        ref={ref}
+        className={className}
+        {...props}
+        style={[style, { fontFamily: font.fontFamily, fontWeight: 'normal' }, font.role === 'mono' ? { fontVariant: ['tabular-nums'] } : null]}
+      />
     </FontContext.Provider>
   );
 });

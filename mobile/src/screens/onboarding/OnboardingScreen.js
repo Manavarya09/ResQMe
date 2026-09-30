@@ -42,8 +42,8 @@ export default function OnboardingScreen() {
           ) : null}
         </View>
         <ProgressBar total={STEPS.length} index={index} />
-        <Text className="text-[11px] font-extrabold text-slate-400 tracking-widest" style={{ fontVariant: ['tabular-nums'] }}>
-          {`${pad(index + 1)} / ${pad(STEPS.length)}`}
+        <Text className="text-xs font-bold text-slate-400" style={{ fontVariant: ['tabular-nums'] }}>
+          {`Step ${index + 1} of ${STEPS.length}`}
         </Text>
         <View style={{ minWidth: 40, alignItems: 'flex-end' }}>
           {index < last ? (
