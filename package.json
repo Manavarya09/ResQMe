@@ -1,0 +1,24 @@
+{
+  "name": "resqme",
+  "private": true,
+  "version": "1.0.0",
+  "description": "ResQMe — Intelligent Cyber-Physical Emergency Response System (monorepo)",
+  "scripts": {
+    "setup": "npm install --prefix backend && npm install --prefix mobile && npm run setup:ai && npm run seed",
+    "setup:ai": "node scripts/py.js --create-venv",
+    "seed": "npm run seed --prefix backend",
+    "dev": "concurrently -k -n ai,api,app -c magenta,blue,yellow \"npm:dev:ai\" \"npm:dev:api\" \"npm:dev:app\"",
+    "dev:ai": "node scripts/py.js -m uvicorn app.main:app --host 0.0.0.0 --port 8100",
+    "dev:api": "npm run dev --prefix backend",
+    "dev:app": "npm start --prefix mobile",
+    "dev:web": "npm run web --prefix mobile",
+    "test": "npm run test:api && npm run test:ai && npm run test:app",
+    "test:api": "npm test --prefix backend",
+    "test:ai": "node scripts/py.js -m pytest -q",
+    "test:app": "npm test --prefix mobile -- --watchAll=false",
+    "e2e": "node scripts/e2e.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

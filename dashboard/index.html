@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ResQMe Responder Console</title>
+  <meta name="description" content="ResQMe responder dashboard: live incidents, medical IDs, drone dispatch.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f48c25'/%3E%3Cpath d='M16 7v18M7 16h18' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body>
+  <!-- ============ Login ============ -->
+  <section id="login" class="login" hidden>
+    <form id="loginForm" class="login-card" autocomplete="off" novalidate>
+      <div class="brand brand-lg">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></span>
+        <span class="brand-name">ResQ<b>Me</b></span>
+      </div>
+      <h1>Responder Console</h1>
+      <p class="muted">Sign in with a responder account to monitor and coordinate live incidents.</p>
+      <label>Email
+        <input id="loginEmail" type="email" placeholder="responder@resqme.app" autocomplete="off" required>
+      </label>
+      <label>Password
+        <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="new-password" required>
+      </label>
+      <div id="loginError" class="form-error" role="alert"></div>
+      <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Sign in</button>
+      <p class="hint">Demo responder: <code>responder@resqme.app</code> / <code>Responder@123</code></p>
+    </form>
+  </section>
+
+  <!-- ============ Console ============ -->
+  <div id="app" class="app" hidden>
+    <header id="topbar" class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></span>
+        <span class="brand-name">ResQ<b>Me</b></span>
+        <span class="brand-sub">Responder Console</span>
+      </div>
+      <div class="stats" aria-label="Live statistics">
+        <div class="stat stat-open"><span class="stat-val" id="statOpen">0</span><span class="stat-lbl">Open</span></div>
+        <div class="stat stat-ack"><span class="stat-val" id="statAck">0</span><span class="stat-lbl">Acknowledged</span></div>
+        <div class="stat stat-disp"><span class="stat-val" id="statDispatched">0</span><span class="stat-lbl">Dispatched</span></div>
+        <div class="stat stat-drones"><span class="stat-val" id="statDrones">0/0</span><span class="stat-lbl">Drones active</span></div>
+      </div>
+      <div class="topbar-right">
+        <div id="alertBanner" class="alert-banner" hidden>NEW INCIDENT</div>
+        <span id="conn" class="conn conn-off" title="Realtime connection"><i></i><span>Offline</span></span>
+        <span id="clock" class="clock mono">--:--:--</span>
+        <button id="soundBtn" class="icon-btn" title="Toggle alert sound" aria-pressed="true"></button>
+        <span id="whoami" class="whoami"></span>
+        <button id="logoutBtn" class="btn btn-ghost btn-sm">Sign out</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <!-- Queue -->
+      <aside class="panel queue">
+        <div class="panel-head">
+          <h2>Incident queue <span id="queueCount" class="count">0</span></h2>
+          <div class="seg" role="tablist" aria-label="Queue filter">
+            <button class="seg-btn active" data-filter="active" role="tab">Active</button>
+            <button class="seg-btn" data-filter="closed" role="tab">Closed</button>
+            <button class="seg-btn" data-filter="all" role="tab">All</button>
+          </div>
+        </div>
+        <ul id="queueList" class="queue-list" aria-live="polite"></ul>
+        <div id="queueEmpty" class="empty" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+          <p>No incidents here. All clear.</p>
+        </div>
+      </aside>
+
+      <!-- Map -->
+      <section class="panel map-panel">
+        <div id="map" class="map" aria-label="Incident map"></div>
+        <div class="map-legend">
+          <span><i class="lg lg-critical"></i>Critical</span>
+          <span><i class="lg lg-high"></i>High</span>
+          <span><i class="lg lg-medium"></i>Medium</span>
+          <span><i class="lg lg-low"></i>Low</span>
+          <span><i class="lg lg-drone"></i>Drone</span>
+          <span><i class="lg lg-hazard"></i>Hazard</span>
+        </div>
+        <div class="map-tools">
+          <button id="fitBtn" class="btn btn-ghost btn-sm" title="Fit all incidents">Fit all</button>
+          <button id="hazardBtn" class="btn btn-ghost btn-sm" title="Toggle hazard overlay" aria-pressed="true">Hazards</button>
+        </div>
+      </section>
+
+      <!-- Detail -->
+      <aside class="panel detail" id="detail">
+        <div id="detailEmpty" class="empty detail-empty">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/></svg>
+          <p>Select an incident from the queue or the map to see details.</p>
+        </div>
+        <div id="detailBody" hidden></div>
+      </aside>
+    </main>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "ResQMe",
+    "slug": "resqme",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#eef0f5"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.resqme.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "ResQMe shares your location with responders during an emergency and traces your safety route.",
+        "NSMotionUsageDescription": "ResQMe detects crashes and falls using motion sensors.",
+        "NSFaceIDUsageDescription": "Unlock ResQMe with Face ID."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "app.resqme.mobile",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "VIBRATE",
+        "USE_BIOMETRIC",
+        "HIGH_SAMPLING_RATE_SENSORS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "ResQMe shares your location with responders during an emergency."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#f48c25"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Unlock ResQMe with Face ID."
+        }
+      ]
+    ],
+    "scheme": "resqme"
+  }
+}
