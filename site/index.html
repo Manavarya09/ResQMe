@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ResQMe Architecture</title>
+<meta name="description" content="How ResQMe works: impact detection, escalation, route corridors, real-time alerts, security, AI triage, drone dispatch and deployment, with live interactive diagrams.">
+<meta name="theme-color" content="#f7f8fb">
+<meta property="og:title" content="ResQMe Architecture">
+<meta property="og:description" content="Sensing, processing and response in an intelligent cyber-physical emergency response system.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f48c25'/%3E%3Cpath d='M16 7v18M7 16h18' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<link rel="stylesheet" href="assets/css/main.css">
+<script>document.documentElement.classList.remove('no-js');</script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script type="module" src="assets/js/main.js"></script>
+</head>
+<body>
+<a class="skip" href="#overview">Skip to content</a>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="#top" aria-label="ResQMe architecture, back to top">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+      ResQMe <small>Architecture</small>
+    </a>
+    <nav class="nav-links" id="navLinks" aria-label="Sections">
+      <a href="#overview">Overview</a>
+      <a href="#detection">Detection</a>
+      <a href="#escalation">Escalation</a>
+      <a href="#corridor">Corridor</a>
+      <a href="#realtime">Real-time</a>
+      <a href="#security">Security</a>
+      <a href="#ai">AI</a>
+      <a href="#drones">Drones</a>
+      <a href="#deploy">Deploy</a>
+      <a href="#limits">Limits</a>
+      <a href="#reference">Reference</a>
+    </nav>
+    <a class="nav-gh" href="https://github.com/Manavarya09/ResQMe" aria-label="ResQMe on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+  </div>
+  <div class="progress" aria-hidden="true"><span id="progress"></span></div>
+</header>
+
+<main id="top">
+  <!-- ===================================================== HERO -->
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">How ResQMe works</span>
+      <h1>From a phone's accelerometer to a <span>responder at the scene</span></h1>
+      <p class="lead">ResQMe is an intelligent cyber-physical emergency response system. It detects crashes and falls on the phone, asks if you are okay, and if you do not answer, alerts responders and your contacts with your live location, medical ID and an automatic triage, then sends a drone to look.</p>
+      <div class="cta">
+        <a class="btn primary" href="#overview">Explore the architecture</a>
+        <a class="btn" href="https://github.com/Manavarya09/ResQMe">View the source</a>
+      </div>
+      <div class="stats rv">
+        <div class="stat"><b>50 Hz</b><span>motion sensing on the phone</span></div>
+        <div class="stat"><b>30 s</b><span>"Are you OK?" window before escalating</span></div>
+        <div class="stat"><b>150 m</b><span>safety corridor around a planned walk</span></div>
+        <div class="stat"><b>15 m/s</b><span>simulated drone to the scene</span></div>
+      </div>
+
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><span class="live">Live</span><h4>A fall, as the phone sees it</h4><span class="sp"></span><span class="state" id="heroState" aria-live="off">walking</span></div>
+          <canvas id="heroScope" aria-label="Animated accelerometer trace showing walking, a free-fall, an impact and stillness, classified as a fall"></canvas>
+          <div class="chain" id="heroChain">
+            <div class="cn"><b>Sensors</b>accelerometer + gyroscope</div>
+            <div class="cn"><b>Detector</b>runs on the phone</div>
+            <div class="cn"><b>Are you OK?</b>30 second countdown</div>
+            <div class="cn"><b>Backend</b>incident + triage</div>
+            <div class="cn"><b>Live alert</b>to every responder</div>
+            <div class="cn"><b>Response</b>console, SMS, drone</div>
+          </div>
+        </div>
+        <figcaption>Walking, then a short free-fall, a hard impact and stillness. When the detector recognises the pattern, the alert travels along the response chain below the trace.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================================================== OVERVIEW -->
+  <section class="sec" id="overview">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Overview</span>
+        <h2 class="h">Three layers, one loop</h2>
+        <p class="lead rv">The project frames ResQMe as a loop with three layers: a <strong>physical</strong> layer that senses, a <strong>cyber</strong> layer that decides, and an <strong>actuation</strong> layer that responds. In code that is four deployable parts: an Expo mobile app, a Node.js API with real-time sockets and a drone simulator, a Python AI service, and a responder console, all sharing one PostgreSQL database.</p>
+        <p class="rv">Three rules shaped the design. <strong>Detection never needs the network:</strong> the phone classifies motion, runs the countdown, and can still dial and text offline. <strong>Intelligence degrades instead of failing:</strong> every AI call has a timeout and a rule-based fallback. <strong>The server is the source of truth:</strong> incidents, drones and hazards are saved first and broadcast second.</p>
+      </div>
+
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><h4>System map</h4><span class="sub">Select a component to see what it does</span><span class="sp"></span>
+            <span class="legend"><span><i></i>call or request</span><span><i class="d"></i>fallback</span><span><i class="p"></i>data in flight</span></span>
+          </div>
+          <div class="sys">
+            <div class="sys-svg" id="sysSvg" role="img" aria-label="Interactive three-layer system diagram"></div>
+            <div class="sys-panel" id="sysPanel" aria-live="polite"></div>
+          </div>
+        </div>
+        <figcaption>Dots travel in the direction data flows. Selecting a component highlights its connections and names the protocol on each one.</figcaption>
+      </figure>
+
+      <div class="tbl rv">
+        <table>
+          <thead><tr><th>Layer</th><th>What it handles</th><th>Built with</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Physical</strong></td><td>motion, position, weather, crime and accident reports</td><td>Phone accelerometer and gyroscope at 50 Hz, GPS, Open-Meteo weather, seeded and user-reported hazards</td></tr>
+            <tr><td><strong>Cyber</strong></td><td>detection, escalation, triage, encryption, alert routing</td><td>On-device detector, Express REST API, Socket.IO, FastAPI AI service with OpenRouter and rules fallback, AES-256-GCM, PostgreSQL 16</td></tr>
+            <tr><td><strong>Actuation</strong></td><td>alerts, dispatch, guidance</td><td>Hold-to-SOS, SMS to contacts, quick dial, responder console, drone dispatch, CPR pacer, hazard notifications</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prose">
+        <h3 class="rv">Sensing the environment</h3>
+        <p class="rv">Not everything is sensed on the body. For any location the API reads current conditions from Open-Meteo (cached for ten minutes per area) and turns them into hazards with simple rules. If an area has fewer than three known hazards, a few crime and accident zones are generated from a seeded random generator, so the same street always shows the same demo risks.</p>
+      </div>
+      <div class="tbl rv">
+        <table>
+          <thead><tr><th>Measurement</th><th>Condition</th><th>Hazard</th><th>Becomes critical when</th></tr></thead>
+          <tbody>
+            <tr><td>Temperature</td><td class="m">40 &deg;C or more</td><td><span class="pill warn">heat</span></td><td>45 &deg;C or more</td></tr>
+            <tr><td>Rainfall rate</td><td class="m">10 mm/h or more</td><td><span class="pill warn">flood</span></td><td>30 mm/h or more</td></tr>
+            <tr><td>Visibility</td><td class="m">under 1000 m</td><td><span class="pill">fog</span></td><td>high below 200 m</td></tr>
+            <tr><td>Wind gusts</td><td class="m">60 km/h or more</td><td><span class="pill warn">storm</span></td><td>90 km/h or more</td></tr>
+            <tr><td>Thunderstorm code</td><td class="m">WMO 95, 96, 99</td><td><span class="pill warn">storm</span></td><td>with hail (96, 99)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== DETECTION -->
+  <section class="sec" id="detection">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Physical to cyber</span>
+        <h2 class="h">Detecting a fall or a crash</h2>
+        <p class="lead rv">A phone lying still measures about 1 g. While it falls, that reading drops toward zero; at impact it spikes; and after a real fall, the person (and the phone) lies still. The detector looks for exactly that three-part pattern, using the overall strength of the acceleration so it works however the phone sits in a pocket or bag.</p>
+      </div>
+      <div class="eq rv">\[ |a| = \sqrt{a_x^2 + a_y^2 + a_z^2} \qquad \text{sampled 50 times a second} \]</div>
+      <div class="prose">
+        <ul class="rv">
+          <li><strong>Impact:</strong> the peak reaches the sensitivity threshold: 2.0 g (high), 2.5 g (medium, default) or 3.0 g (low).</li>
+          <li><strong>Free-fall:</strong> just before the impact, a run below 0.4 g lasting at least 150 ms. That is a drop of about 11 cm or more.</li>
+          <li><strong>Stillness:</strong> in the second after the impact (skipping the first 150 ms of bounce), the readings barely vary:</li>
+        </ul>
+      </div>
+      <div class="eq rv">\[ \sigma = \sqrt{\tfrac{1}{N}\textstyle\sum_k \big(|a_k| - \bar a\big)^2} \;<\; 0.15\ \text{g} \quad \text{over } [\,t_{peak}+150\text{ ms},\ t_{peak}+1150\text{ ms}\,] \]</div>
+
+      <div class="tbl rv">
+        <table>
+          <caption>How a window is classified (checked top to bottom)</caption>
+          <thead><tr><th>Evidence</th><th>Result</th><th>Does it raise an alert?</th></tr></thead>
+          <tbody>
+            <tr><td>Peak below the threshold</td><td><span class="pill">none</span></td><td>No</td></tr>
+            <tr><td>Peak of 6 g or more, no free-fall</td><td><span class="pill crit">vehicle crash</span></td><td><strong>Yes</strong></td></tr>
+            <tr><td>Free-fall, then stillness</td><td><span class="pill crit">fall</span></td><td><strong>Yes</strong></td></tr>
+            <tr><td>Free-fall, then movement</td><td><span class="pill">drop</span></td><td>No: the phone was picked back up</td></tr>
+            <tr><td>No free-fall, but stillness after a peak 1 g above the threshold</td><td><span class="pill crit">fall</span></td><td><strong>Yes</strong> (a collapse)</td></tr>
+            <tr><td>Anything else</td><td><span class="pill">none</span></td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="rv">Try it</h3>
+      <p class="prose rv">This playground builds a sensor window from four settings and runs the app's own detection function on it (a line-for-line copy of <code>analyzeWindow</code> from <code>mobile/src/lib/impactDetector.js</code>). The orange band is the free-fall the detector measured; the grey band is the one-second stillness window.</p>
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><span class="live">Live</span><h4>Detector playground</h4><span class="sub">same code as the app</span></div>
+          <div class="pg">
+            <div class="pg-canvas"><canvas id="pgScope" aria-label="Synthetic acceleration window with the detector's measurements"></canvas></div>
+            <div class="pg-controls">
+              <div class="presets" role="group" aria-label="Presets">
+                <button class="btn sm" type="button" data-preset="fall">Fall</button>
+                <button class="btn sm" type="button" data-preset="drop">Dropped phone</button>
+                <button class="btn sm" type="button" data-preset="crash">Crash</button>
+                <button class="btn sm" type="button" data-preset="collapse">Collapse</button>
+                <button class="btn sm" type="button" data-preset="stumble">Stumble</button>
+              </div>
+              <div class="ctl"><label for="pgFF">Free-fall time <output id="pgFFo"></output></label><input id="pgFF" type="range" min="0" max="600" step="20" value="320"></div>
+              <div class="ctl"><label for="pgPeak">Impact strength <output id="pgPeako"></output></label><input id="pgPeak" type="range" min="1.2" max="10" step="0.1" value="5.2"></div>
+              <div class="ctl"><label for="pgJit">Movement after impact <output id="pgJito"></output></label><input id="pgJit" type="range" min="0" max="0.6" step="0.01" value="0.02"></div>
+              <div class="ctl"><label>Sensitivity <output id="pgSenso"></output></label>
+                <div class="seg" id="pgSens" role="group" aria-label="Sensitivity"><button type="button" data-s="low">Low</button><button type="button" data-s="medium" aria-pressed="true">Medium</button><button type="button" data-s="high">High</button></div>
+              </div>
+              <div class="readout" id="pgRead" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+        <figcaption>Try "Dropped phone": the fall and impact look identical, but movement afterwards (someone picking it up) fails the stillness test, so no alert is raised.</figcaption>
+      </figure>
+
+      <div class="prose">
+        <h3 class="rv">From a live stream to one decision</h3>
+        <p class="rv">On the phone, samples flow into a five-second buffer. When a reading crosses the threshold, the detector waits 1.2 seconds (enough to see the stillness window), then analyses the buffer once. A fall or crash raises an alert and starts a ten-second cooldown so the bounce of one event cannot trigger a second alert. The last five seconds of raw samples travel with the incident, and the server scores them again with its own copy of the algorithm to give responders a confidence value.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== ESCALATION -->
+  <section class="sec" id="escalation">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Cyber to actuation</span>
+        <h2 class="h">Asking first, then escalating</h2>
+        <p class="lead rv">A detection is a guess, so the phone asks. A full-screen "Are you OK?" screen vibrates and counts down. Tapping "I'm OK" cancels; silence sends help. How long it waits depends on who raised the alarm.</p>
+      </div>
+      <div class="tbl rv">
+        <table>
+          <thead><tr><th>Trigger</th><th>Raised by</th><th>Countdown</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Impact</strong></td><td>the detector found a fall or crash</td><td class="m">30 s</td></tr>
+            <tr><td><strong>Route deviation</strong></td><td>outside the walking corridor for 60 s</td><td class="m">30 s</td></tr>
+            <tr><td><strong>Timer expired</strong></td><td>the journey took longer than planned</td><td class="m">30 s</td></tr>
+            <tr><td><strong>SOS</strong></td><td>the SOS button held for 1.5 s</td><td class="m">5 s</td></tr>
+            <tr><td><strong>Manual</strong></td><td>an explicit report</td><td class="m">5 s</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose rv">
+        <p>Someone who pressed SOS already said they need help, so five seconds is just an undo window. An algorithm that guessed gets thirty. After the countdown the phone creates the incident on the server, which then moves from <strong>open</strong> to <strong>acknowledged</strong> and <strong>dispatched</strong>, ending as <strong>resolved</strong> or <strong>cancelled</strong>.</p>
+        <p>If the server cannot be reached, the phone does not wait. It keeps an offline copy of the alert, saves it to storage, and keeps quick dial, SMS and first-aid guidance working while it retries every 10 seconds and whenever the app comes back to the foreground. When a retry succeeds, the offline alert is swapped for the real one without leaving the screen.</p>
+      </div>
+
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><h4>Escalation states</h4><span class="sub">play the road-accident scenario</span></div>
+          <div class="fsm-svg" id="fsmSvg" role="img" aria-label="Escalation state diagram"></div>
+          <div class="fsm-console">
+            <div class="fsm-clock">
+              <div class="lbl" id="fsmClockLbl">Scenario clock</div>
+              <div class="big" id="fsmClock">T+0.0 s</div>
+              <div class="ctrls">
+                <button class="btn primary sm" type="button" id="fsmPlay">Play scenario</button>
+                <button class="btn sm" type="button" id="fsmStep">Step</button>
+                <button class="btn sm" type="button" id="fsmReset">Reset</button>
+              </div>
+            </div>
+            <div class="fsm-log" aria-live="polite">
+              <div id="fsmLog"><span class="step-k">Ready</span><h4>Eight steps from sensor to resolution</h4><p>Play the road-accident workflow from the project proposal. The 30 second countdown runs ten times faster here; steps that depend on a responder show symbolic times.</p></div>
+              <div class="fsm-steps" id="fsmSteps"></div>
+            </div>
+          </div>
+        </div>
+        <figcaption>States left of "open" exist only on the phone; the rest match the incident's status on the server. The owner can cancel from any active state (shown once, from "open").</figcaption>
+      </figure>
+      <p class="prose rv">After an app restart, the phone restores whatever is still active: a queued offline alert (only for the account that raised it) or a live incident. During an incident it shares its location every 15 seconds if location sharing is allowed, and checks on the assigned drone every 5 seconds in case the live connection drops.</p>
+    </div>
+  </section>
+
+  <!-- ===================================================== CORRIDOR -->
+  <section class="sec" id="corridor">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Physical to cyber</span>
+        <h2 class="h">Walk with me: the safety corridor</h2>
+        <p class="lead rv">Before walking somewhere, a user taps a route on the map and sets a time limit. The safe area is everything within 150 m of that route. Once a second the app measures how far the user is from the nearest point on it.</p>
+        <p class="rv">At city scale the Earth is flat enough, so each route segment is projected onto a flat grid in metres. The distance to a segment from A to B is the distance to the closest point on it, found by projecting and clamping to the segment's ends:</p>
+      </div>
+      <div class="eq rv">\[ t^\ast = \operatorname{clamp}\!\left(\frac{(p-a)\cdot(b-a)}{\lVert b-a\rVert^2},\ 0,\ 1\right), \qquad d = \min_{\text{segments}} \big\lVert\, p - (a + t^\ast (b-a)) \,\big\rVert \]</div>
+      <div class="prose rv">
+        <p>Inside means <em>d</em> of 150 m or less. Staying outside for 60 seconds in a row raises a <strong>route deviation</strong> alert; getting within 80 m of the destination ends the walk. Separately, running past the time limit raises <strong>timer expired</strong>. Both go through the same 30 second "Are you OK?" countdown.</p>
+      </div>
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><span class="live">Live</span><h4>Corridor check</h4><span class="sub">drag the walker, or let it walk</span><span class="sp"></span><span class="sub" id="corClock">timer runs 8x faster</span></div>
+          <div class="cor">
+            <canvas id="corCanvas" aria-label="Draggable walker near a planned route with a 150 metre corridor"></canvas>
+            <div class="cor-read" id="corRead" aria-live="polite"></div>
+          </div>
+        </div>
+        <figcaption>The shaded band is the 150 m corridor; the line from the walker shows the shortest distance to the route. The countdown resets as soon as the walker steps back inside, so a short detour never raises an alert.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================================================== REALTIME -->
+  <section class="sec" id="realtime">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Cyber</span>
+        <h2 class="h">Real-time alerts</h2>
+        <p class="lead rv">Requests change things; live events announce the change. Every update is saved to the database first and then pushed over Socket.IO to the right people, so a client that reconnects can always reload with one request and then follow the stream.</p>
+        <p class="rv">The live connection is signed in with the same token as normal requests and checked the same way. Every connection joins a private room for its user; responders also join a shared <code>responders</code> room. Signing out of all devices disconnects every live connection at once.</p>
+      </div>
+      <div class="tbl rv">
+        <table>
+          <thead><tr><th>Event</th><th>Sent to</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td><code>incident:new</code></td><td>all responders</td><td>a new incident is saved</td></tr>
+            <tr><td><code>incident:updated</code></td><td>responders and the incident owner</td><td>acknowledged, drone sent, resolved, cancelled, or a new timeline entry</td></tr>
+            <tr><td><code>incident:location</code></td><td>responders and the owner</td><td>the owner's phone sends a new position (every 15 s)</td></tr>
+            <tr><td><code>drone:update</code></td><td>responders and the owner</td><td>on dispatch and every second while the drone flies</td></tr>
+            <tr><td><code>hazard:new</code></td><td>everyone</td><td>someone reports a hazard</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><h4>One incident, end to end</h4><span class="sub">grey: request &middot; orange: live event</span><span class="sp"></span><button class="btn sm" type="button" id="seqReplay">Replay</button></div>
+          <div class="seq-svg" id="seqSvg" role="img" aria-label="Sequence of messages for one incident from creation to resolution"></div>
+        </div>
+        <figcaption>Taken from the incident routes and services. The AI calls have 4 second time limits; if one fails, the API uses its own rules and the sequence continues unchanged. The incident and its first timeline entries are saved in one transaction before anyone is notified.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================================================== SECURITY -->
+  <section class="sec" id="security">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Cyber</span>
+        <h2 class="h">Data and security</h2>
+        <p class="lead rv">Ten tables hold the whole system. One choice matters most: an incident keeps a <strong>snapshot</strong> of the medical ID and contacts from the moment help was requested, so responders see what was true then, even if the user edits their details later.</p>
+      </div>
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><h4>Database schema</h4><span class="sub">orange: links to another table &middot; green: encrypted</span></div>
+          <div class="schema" id="schema"></div>
+        </div>
+        <figcaption>Deleting an account removes everything the user owns. Incidents and hazards that mention a responder or reporter keep the record and just clear that link.</figcaption>
+      </figure>
+
+      <div class="prose">
+        <h3 class="rv">Encrypted medical IDs</h3>
+        <p class="rv">Medical IDs and two-factor secrets are encrypted with AES-256-GCM using a 32-byte server key. Every save uses a fresh random 12-byte IV, and the database stores three values: the IV, a 16-byte authentication tag and the ciphertext. If a single bit is changed, decryption refuses to return anything.</p>
+        <h3 class="rv">Two-factor sign-in</h3>
+        <p class="rv">Users and responders can turn on authenticator-app codes (RFC 6238), implemented with Node's built-in crypto only. The code changes every 30 seconds:</p>
+      </div>
+      <div class="eq rv">\[ C = \left\lfloor \frac{t}{30\,\text{s}} \right\rfloor, \qquad \text{code} = \operatorname{truncate}\big(\mathrm{HMAC\text{-}SHA1}(K, C)\big) \bmod 10^6 \]</div>
+      <p class="prose rv">The server accepts the previous, current or next code to allow for clock drift, compares in constant time, and never accepts the same time step twice, so a stolen code cannot be replayed. Eight single-use recovery codes are stored only as keyed hashes.</p>
+
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><span class="live">Live</span><h4>Both, running in your browser</h4><span class="sub">temporary keys; nothing leaves this page</span></div>
+          <div class="lab">
+            <div>
+              <h4>AES-256-GCM</h4>
+              <input type="text" id="aesIn" aria-label="Text to encrypt" value='{"bloodType":"O+","allergies":["penicillin"],"conditions":["asthma"]}'>
+              <div class="env" aria-hidden="true"><div><b>iv</b><span>12 bytes</span></div><div><b>tag</b><span>16 bytes</span></div><div class="ct"><b>ciphertext</b><span>same length as the text</span></div></div>
+              <div class="row"><button class="btn primary sm" type="button" id="aesEnc">Encrypt</button><button class="btn sm" type="button" id="aesTamper" disabled>Change one bit and decrypt</button></div>
+              <div class="hexout" id="aesOut" aria-live="polite"><span class="k">A random 256-bit key is created in this page. The result is shown the way it is stored in the database.</span></div>
+            </div>
+            <div>
+              <h4>Authenticator code</h4>
+              <div class="totp-ring"><svg viewBox="0 0 54 54" aria-hidden="true"><circle class="bg" cx="27" cy="27" r="22"/><circle class="fg" id="totpRing" cx="27" cy="27" r="22" stroke-dasharray="138.23" stroke-dashoffset="0"/></svg><div><div class="totp-big" id="totpCode">--- ---</div><div class="totp-step" id="totpStep">time step C</div></div></div>
+              <p class="mac" id="totpMac"></p>
+              <p class="note-sm">Uses the public demo secret JBSWY3DPEHPK3PXP. Highlighted: the four bytes picked by the last byte's low half, which become the six-digit code.</p>
+            </div>
+          </div>
+        </div>
+        <figcaption>Change one bit of the ciphertext and decryption fails, which is exactly the property the server relies on.</figcaption>
+      </figure>
+
+      <div class="prose">
+        <h3 class="rv">Sessions, limits and the audit log</h3>
+        <p class="rv">Sign-in tokens last 30 days and carry a version number. A request is accepted only if that number matches the user's current version; "sign out of all devices" and password changes bump it, which instantly invalidates every old token and live connection. With two-factor on, the password step only returns a five-minute token that can do nothing except finish sign-in.</p>
+      </div>
+      <div class="tbl rv">
+        <table>
+          <caption>Rate limits</caption>
+          <thead><tr><th>What</th><th>Limit</th><th>Counted per</th></tr></thead>
+          <tbody>
+            <tr><td>Sign-in, registration and security changes</td><td class="m">50 per 15 min</td><td>IP address</td></tr>
+            <tr><td>Two-factor code attempts</td><td class="m">10 per 5 min</td><td>account</td></tr>
+            <tr><td>Creating incidents</td><td class="m">10 per minute</td><td>user</td></tr>
+            <tr><td>Reporting hazards</td><td class="m">10 per 10 min</td><td>user</td></tr>
+            <tr><td>AI chat messages</td><td class="m">30 per minute</td><td>user</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose rv">Passwords are hashed with bcrypt. An audit log records sign-ins, security changes, medical ID views and incident actions; users can read their own log, export all their data and delete their account. Logs never contain passwords, tokens or medical data, and in production the API refuses to start with weak secrets or without a list of allowed web origins.</p>
+    </div>
+  </section>
+
+  <!-- ===================================================== AI -->
+  <section class="sec" id="ai">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Cyber</span>
+        <h2 class="h">The AI layer</h2>
+        <p class="lead rv">The AI service is a small FastAPI app with three jobs. Only the crisis chat depends on a language model. Triage is decided by rules (a model may only reword the summary), and motion scoring is plain arithmetic. The rule written into the design: the AI supports people and never replaces emergency services.</p>
+        <h3 class="rv">Crisis chat</h3>
+      </div>
+      <figure class="rv">
+        <div class="card">
+          <div class="pipe">
+            <div class="pipe-bar"><button class="btn sm" type="button" id="pipeFail" aria-pressed="false">Simulate a model failure</button><span id="pipeStatus">Path: language model</span></div>
+            <ol id="pipe">
+              <li><b>Clean up</b>keeps the last 12 messages, 2000 characters each</li>
+              <li><b>Prompt</b>adds the incident, location, medical ID and local emergency number</li>
+              <li><b>OpenRouter</b>gpt-4o-mini, JSON answer, 12 second limit</li>
+              <li><b>Parse</b>finds the JSON even inside extra text</li>
+              <li><b>Check</b>up to 4 quick replies, known video ids, valid severity</li>
+              <li><b>Safety net</b>serious answer without the emergency number? add it</li>
+            </ol>
+            <div class="fb" id="pipeFb"><b>Rules engine</b><span>If steps 3 to 5 fail for any reason, a built-in engine answers instead: 14 first-aid topics (CPR, choking, bleeding, chest pain, seizures, burns, road accidents, panic and more) with fixed steps, quick replies and videos. If the whole AI service is down, the API returns its own short rules answer.</span></div>
+          </div>
+        </div>
+        <figcaption>Both paths return the same shape (reply, quick replies, videos, severity, source), so the app never needs to know which one answered.</figcaption>
+      </figure>
+      <div class="callout rv"><b>What the prompt asks for</b>Short numbered steps, most urgent first; exactly one follow-up question; for anything life-threatening, the first line says to call the local emergency number; never diagnose; respect allergies in the medical ID; under 120 words.</div>
+
+      <div class="prose">
+        <h3 class="rv">Triage</h3>
+        <p class="rv">Severity is computed by rules so it is predictable and auditable. Impact and SOS start at <em>high</em>; the other triggers at <em>medium</em>. A crash signature or a peak of 8 g sets <em>critical</em>; a high-risk condition such as diabetes, epilepsy, heart disease, asthma or blood thinners raises it one level; and words like "not breathing" or "bleeding" in a note or chat set <em>critical</em>.</p>
+      </div>
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><span class="live">Live</span><h4>Triage calculator</h4><span class="sub">same rules as the AI service</span></div>
+          <div class="triage">
+            <div class="tri-in">
+              <div class="ctl"><label for="triTrigger">Trigger</label><select id="triTrigger"><option value="impact">Impact</option><option value="sos">SOS</option><option value="route_deviation">Route deviation</option><option value="timer_expired">Timer expired</option><option value="manual">Manual</option></select></div>
+              <div class="ctl"><label for="triClass">Detected as</label><select id="triClass"><option value="">Nothing</option><option value="fall" selected>Fall</option><option value="drop">Drop</option><option value="vehicle_crash">Vehicle crash</option></select></div>
+              <div class="ctl"><label for="triPeak">Impact peak <output id="triPeako"></output></label><input id="triPeak" type="range" min="0" max="12" step="0.1" value="5.2"></div>
+              <div class="ctl"><label for="triMed">Conditions or medication</label><input type="text" id="triMed" value="asthma"></div>
+              <div class="ctl"><label for="triNote">Note or chat message</label><input type="text" id="triNote" value="" placeholder="e.g. he is not breathing"></div>
+            </div>
+            <div class="tri-out" id="triOut" aria-live="polite"></div>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================================================== DRONES -->
+  <section class="sec" id="drones">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Actuation</span>
+        <h2 class="h">Drone dispatch</h2>
+        <p class="lead rv">The drones are simulated, and the app says so. Three drones are based at Connaught Place, Saket and Dwarka in Delhi. Once a second the server moves every flying drone, saves it and sends a live update.</p>
+        <p class="rv">Dispatch picks the nearest idle drone (locking the rows so two incidents cannot grab the same one). If none is within 25 km, one is moved to a base 2 to 4 km from the incident. Each second the drone flies 15 m along the shortest path over the Earth's surface:</p>
+      </div>
+      <div class="eq rv">\[ \text{ETA} = \left\lceil \frac{d - 30\ \text{m}}{15\ \text{m/s}} \right\rceil, \qquad \text{battery drain} = 0.05\%\ \text{per second of flight}, \qquad \text{on scene within } 30\ \text{m} \]</div>
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><span class="live">Live</span><h4>Fleet simulation</h4><span class="sub">click the map to report an incident &middot; 20x speed</span></div>
+          <div class="drone">
+            <canvas id="droneMap" aria-label="Map of Delhi with three simulated drone bases; click to place an incident"></canvas>
+            <div class="drone-read">
+              <table><thead><tr><th>Drone</th><th>Status</th><th>Battery</th><th>ETA</th></tr></thead><tbody id="droneRows"></tbody></table>
+              <div class="ev" id="droneEv" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+        <figcaption>The same step function as the server. After the responder resolves the incident, the drone flies home, lands and has its battery swapped. If the person moves more than 30 m, a hovering drone follows.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================================================== DEPLOY -->
+  <section class="sec" id="deploy">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Operations</span>
+        <h2 class="h">Deployment</h2>
+        <p class="lead rv">In production ResQMe runs as three Docker containers. Only the API is published; the AI service is reachable only inside the private network, and the database must be healthy before the API starts.</p>
+      </div>
+      <figure class="rv">
+        <div class="card">
+          <div class="topo">
+            <div class="svc"><h5>db <span>postgres:16-alpine</span></h5><dl><dt>Storage</dt><dd>pgdata volume</dd><dt>Health</dt><dd>pg_isready every 5 s</dd><dt>Access</dt><dd>internal only</dd></dl></div>
+            <div class="svc"><h5>api <span>port 4100</span></h5><dl><dt>Serves</dt><dd>REST API, live events, responder console, medical ID links</dd><dt>Waits for</dt><dd>db healthy, ai started</dd><dt>Probes</dt><dd>/health, /ready</dd></dl></div>
+            <div class="svc"><h5>ai <span>internal 8100</span></h5><dl><dt>Config</dt><dd>OpenRouter key and model, timeout</dd><dt>No key</dt><dd>rules engine only</dd></dl></div>
+            <div class="netline">private Docker network &middot; HTTPS ends at your reverse proxy</div>
+          </div>
+        </div>
+        <figcaption>From <code>docker-compose.yml</code>. Required secrets (database password, JWT secret, medical key, allowed origins) must be set or startup fails straight away.</figcaption>
+      </figure>
+      <div class="prose">
+        <h3 class="rv">Continuous integration</h3>
+        <p class="rv">Every push to <code>main</code> and every pull request runs three test suites side by side, then builds both Docker images. The backend tests run against a real PostgreSQL 16; the AI tests run with the language model switched off; the mobile job runs the logic tests and bundles the Android app.</p>
+      </div>
+      <figure class="rv">
+        <div class="card">
+          <div class="card-head"><span class="live">Live</span><h4>CI pipeline</h4><span class="sub">illustrative timing</span></div>
+          <div class="ci" id="ci"></div>
+        </div>
+        <figcaption>The Docker job waits for the backend and AI jobs; the mobile job runs on its own. This website is published by a separate GitHub Pages workflow.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================================================== LIMITS -->
+  <section class="sec" id="limits">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Honesty</span>
+        <h2 class="h">Limits and ethics</h2>
+        <p class="lead rv">An emergency app that overpromises is worse than none. These are the boundaries as built.</p>
+      </div>
+      <ul class="limits rv">
+        <li><b>No silent texts or calls</b>Phones do not let apps send messages or call without the user, so ResQMe opens a pre-filled SMS and relies on the countdown having already alerted responders.</li>
+        <li><b>Expo Go limits</b>Notifications while the app is closed and live video calls need a custom build; in Expo Go, hazard alerts are local and detection runs while the app is open.</li>
+        <li><b>Drones are simulated</b>The fleet, bases and flight model demonstrate dispatch and live tracking; they are not connected to real aircraft.</li>
+        <li><b>AI supports, never replaces</b>Every serious answer says to call the local emergency number, severity comes from auditable rules, and without an API key everything runs on rules.</li>
+        <li><b>Detection is a heuristic</b>The thresholds are based on physics, not trained on a labelled fall dataset. False alarms are expected, which is why the countdown exists.</li>
+        <li><b>Consent first</b>Location is shared only during an emergency and only with permission; the medical ID only with consent; no IMEI tracking.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================================================== REFERENCE -->
+  <section class="sec" id="reference">
+    <div class="wrap">
+      <div class="prose">
+        <span class="eyebrow">Reference</span>
+        <h2 class="h">API, code map and setup</h2>
+        <p class="rv">The backend listens on port 4100. Requests need <code>Authorization: Bearer &lt;token&gt;</code> unless marked public; errors come back as <code>{ "error": "..." }</code>.</p>
+      </div>
+      <div class="tbl rv">
+        <table id="apiTable">
+          <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Notes</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="prose">
+        <h3 class="rv">Where things live</h3>
+      </div>
+      <div class="codeblock rv">
+        <ul class="tree">
+          <li><b>mobile/</b><span>Expo SDK 54 app. <code>src/lib</code> holds the detector, geometry, sensors and API client; <code>src/context</code> holds emergency, tracking, location and auth state.</span></li>
+          <li><b>backend/</b><span>Node 22, Express and Socket.IO on port 4100. Services for incidents, drones, hazards, weather, encryption, two-factor and audit; SQL migrations in <code>db/migrations</code>.</span></li>
+          <li><b>ai-service/</b><span>Python 3.13 and FastAPI on port 8100: chat, triage, motion scoring and the rules engine.</span></li>
+          <li><b>dashboard/</b><span>The responder console, served by the backend at <code>/dashboard</code>.</span></li>
+          <li><b>scripts/</b><span>End-to-end test of the full accident workflow and a cross-platform Python launcher.</span></li>
+          <li><b>site/</b><span>This website.</span></li>
+        </ul>
+      </div>
+
+      <div class="prose">
+        <h3 class="rv">Run it locally</h3>
+        <ol class="steps rv">
+          <li><span>Install Node 20+, Python 3.11+, PostgreSQL 16 and the Expo Go app (SDK 54).</span></li>
+          <li><span>Create the databases: <code>createdb -U postgres resqme</code> and <code>createdb -U postgres resqme_test</code>.</span></li>
+          <li><span>Copy <code>backend/.env.example</code> and <code>ai-service/.env.example</code> to <code>.env</code> (the OpenRouter key is optional).</span></li>
+          <li><span>Run <code>npm install</code> then <code>npm run setup</code> to install everything and add demo data.</span></li>
+          <li><span>Run <code>npm run dev</code> and scan the QR code with Expo Go. The responder console is at <code>localhost:4100/dashboard</code>.</span></li>
+          <li><span>For production: copy <code>.env.example</code> to <code>.env</code>, then <code>docker compose up -d --build</code>.</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>ResQMe &middot; intelligent cyber-physical emergency response</span>
+    <a href="https://github.com/Manavarya09/ResQMe">github.com/Manavarya09/ResQMe</a>
+  </div>
+</footer>
+</body>
+</html>
