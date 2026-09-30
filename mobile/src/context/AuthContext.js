@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   biometricLock: false,
   satelliteFallback: false,
   speakReplies: false,
+  shakeToSos: true,
 };
 
 const AuthContext = createContext(null);

@@ -4,7 +4,7 @@ import Text from '../components/Text';
 import * as LocalAuthentication from 'expo-local-authentication';
 import {
   ShieldCheck, Mail, Smartphone, Lock, Satellite, Fingerprint, LogOut, Activity, MapPin, Bell, HeartPulse, Users,
-  ChevronRight, Globe, Server, GraduationCap, Volume2, Zap, UserRound, History,
+  ChevronRight, Globe, Server, GraduationCap, Volume2, Zap, UserRound, History, Vibrate,
 } from 'lucide-react-native';
 import { Screen, Header, Card, Inset, ToggleRow, SectionLabel, PressScale, Pill, Button } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -75,6 +75,9 @@ export default function SettingsScreen({ navigation }) {
                 </PressScale>
               ))}
             </View>
+          </View>
+          <View className="border-t border-slate-200/70">
+            <ToggleRow icon={Vibrate} title="Shake to SOS" subtitle="Shake your phone hard 3 times to start an SOS countdown" value={settings.shakeToSos !== false} onValueChange={(v) => updateSettings({ shakeToSos: v })} last />
           </View>
           <PressScale onPress={simulateImpact}>
             <View className="flex-row items-center gap-3 px-3 py-3.5 border-t border-slate-200/70">
