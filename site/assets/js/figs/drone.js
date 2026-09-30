@@ -20,7 +20,8 @@ const HOVER_SIM_S = 60;    // on-scene time before the (simulated) responder res
 export default function drone(canvas) {
   const rows = document.getElementById('droneRows');
   const evEl = document.getElementById('droneEv');
-  const view = setupCanvas(canvas, () => draw());
+  let view = null; // assigned below; draw() is a no-op until the canvas is ready
+  view = setupCanvas(canvas, () => view && draw());
   onPaletteChange(draw);
 
   const drones = FLEET.map((f) => ({

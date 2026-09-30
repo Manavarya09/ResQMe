@@ -52,7 +52,8 @@ export default function hero(canvas) {
 
   const chain = [...document.querySelectorAll('#heroChain .cn')];
   const stateEl = document.getElementById('heroState');
-  const view = setupCanvas(canvas, () => draw());
+  let view = null; // assigned below; draw() is a no-op until the canvas is ready
+  view = setupCanvas(canvas, () => view && draw());
 
   let clock = 0; // seconds into the loop
   let lastState = '';

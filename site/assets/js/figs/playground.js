@@ -39,7 +39,8 @@ export default function playground(canvas) {
   let sens = 'medium';
   let samples = [], result = null;
 
-  const view = setupCanvas(canvas, () => draw());
+  let view = null; // assigned below; draw() is a no-op until the canvas is ready
+  view = setupCanvas(canvas, () => view && draw());
   onPaletteChange(draw);
 
   function recompute() {

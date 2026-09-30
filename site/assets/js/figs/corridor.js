@@ -24,7 +24,8 @@ function autoKeys() {
 
 export default function corridor(canvas) {
   const read = document.getElementById('corRead');
-  const view = setupCanvas(canvas, () => draw());
+  let view = null; // assigned below; draw() is a no-op until the canvas is ready
+  view = setupCanvas(canvas, () => view && draw());
   onPaletteChange(draw);
 
   const keys = autoKeys();
