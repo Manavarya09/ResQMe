@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 
+// Original ResQMe palette: soft neumorphic surfaces with an orange accent.
+// Semantic aliases (stone, ink, signal, sos, ok…) point at the same values for new screens.
 export const colors = {
   primary: '#f48c25',
   primaryLight: '#ffb673',
@@ -18,9 +20,31 @@ export const colors = {
   sub: '#6b7280',
   muted: '#94a3b8',
   line: '#e2e8f0',
+
+  stone: '#eef0f5',
+  stoneDeep: '#e4e8ef',
+  ink: '#1e293b',
+  ink2: '#475569',
+  ink3: '#94a3b8',
+  signal: '#f48c25',
+  signalSoft: '#fff1e3',
+  sos: '#ef4444',
+  sosSoft: '#fee2e2',
+  ok: '#16a34a',
+  okSoft: '#dcfce7',
+  info: '#3b82f6',
+  warn: '#ca8a04',
 };
 
 export const severityColor = { low: '#16a34a', medium: '#ca8a04', high: '#f48c25', critical: '#ef4444' };
+
+export const fonts = {
+  body: 'Manrope_500Medium',
+  semibold: 'Manrope_600SemiBold',
+  bold: 'Manrope_700Bold',
+  heavy: 'Manrope_800ExtraBold',
+  mono: 'JetBrainsMono_500Medium',
+};
 
 // Neumorphic raised surface. Web gets a true dual (light + dark) shadow; native approximates with one.
 export const raised = (depth = 1) =>
