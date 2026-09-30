@@ -1,5 +1,7 @@
 # ResQMe — Intelligent Cyber-Physical Emergency Response System
 
+**Architecture walkthrough:** https://manavarya09.github.io/ResQMe/
+
 ResQMe turns a phone into an emergency responder's best friend. It **detects** crashes and falls with motion
 sensors, **escalates** automatically if you don't respond, **transmits** your live location and encrypted medical ID
 to responders, **dispatches** a (simulated) drone for reconnaissance, and **guides** you or bystanders with an AI
@@ -25,14 +27,17 @@ crisis chatbot and 2-minute first-aid videos — while warning you about nearby 
 
 - **SOS** — hold for 1.5 s; a 5 s cancel window, then responders get your location, medical ID and AI triage.
 - **Crash & fall detection** — free-fall → impact → stillness analysis; a 30 s "Are you OK?" countdown with vibration filters false alarms before auto-escalating.
-- **Walk with me** — tap a route on the map, set a time limit; leaving the 150 m safety corridor for 60 s or running late escalates automatically.
+- **Walk with me** — tap stops on the map and ResQMe follows a real walking route with distance and ETA; leaving the 150 m safety corridor for 60 s or running late escalates automatically. Nearby hospitals and police are one tap away.
+- **Live tracking links** — every emergency texts contacts a link to a live map of your position (updated every 15 s); you can also share one from Safety tools for 15 min to 24 h.
+- **Safety tools** — shake the phone three times for SOS, a full-volume siren with a strobing screen, and a realistic fake incoming call to leave a situation.
 - **AI crisis guide** — calm, step-by-step guidance (bleeding, CPR, choking, seizures, assault, panic…), severity badges, quick replies, linked training videos, read-aloud mode, incident-aware context (your medical ID, trigger, country).
 - **Medical ID** — blood type, allergies, conditions, medications; encrypted at rest; QR code opens a 24 h responder link; consent toggle for auto-transmit.
 - **Hazard alerts** — real weather hazards (heat, flood, fog, storm/hail) from Open-Meteo, crime/accident zones, community reports, local notifications.
 - **Drone reconnaissance** — nearest drone dispatched, streamed live to the app and dashboard until on scene.
 - **First-aid micro-training** — 8 modules with official British Red Cross / St John Ambulance videos and a 110 bpm CPR pacer.
-- **Responder console** — live severity-sorted queue, map, triage, impact score, medical card, timeline, acknowledge with ETA, dispatch drone, resolve.
-- **Resilience** — works offline for detection, countdown, quick dial and SMS; restores active incidents after restart; biometric app lock.
+- **Responder console & responder app** — live severity-sorted queue, map, triage, impact score, medical card, timeline, acknowledge with ETA, dispatch drone, resolve — on the web dashboard and in the mobile app for responder accounts.
+- **Onboarding & history** — guided first-run setup with real permission requests, a setup checklist on Home, profile editing, and a history of every alert with its responder timeline.
+- **Resilience** — works offline for detection, countdown, quick dial and SMS; an SOS raised without signal is queued and retried until it reaches responders; restores active incidents after restart; biometric app lock.
 
 ## Quick start (Windows / macOS / Linux)
 
