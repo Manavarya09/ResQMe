@@ -5,6 +5,8 @@ const { requireAuth, requireRole } = require('../auth');
 const incidents = require('../services/incidents');
 const drones = require('../services/drones');
 const realtime = require('../services/realtime');
+const audit = require('../services/audit');
+const { limiter } = require('../rateLimit');
 const { ah, parse, HttpError, zLat, zLng, TRIGGERS } = require('../util');
 
 const router = express.Router();
@@ -13,6 +15,14 @@ router.use('/incidents', requireAuth);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES = ['open', 'acknowledged', 'dispatched', 'resolved', 'cancelled'];
 const num = z.number().finite();
+
+// An SOS must never be silently dropped, so this is generous; it only stops scripted floods.
+const createLimiter = limiter('incidents', { windowMs: 60 * 1000, limit: 10, by: 'user', message: 'Too many incidents created, please wait a minute' });
+
+const listQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+  before: z.string().trim().max(40).refine((v) => !Number.isNaN(Date.parse(v)), 'before must be an ISO timestamp').optional(),
+});
 
 const sampleSchema = z.object({
   t: num, ax: num, ay: num, az: num,
@@ -39,9 +49,10 @@ router.param('id', (req, res, next, id) => {
   return next();
 });
 
-router.post('/incidents', ah(async (req, res) => {
+router.post('/incidents', createLimiter, ah(async (req, res) => {
   const body = parse(createSchema, req.body || {});
   const inc = await incidents.createIncident(req.user, body);
+  await audit.fromReq(req, 'incident_created', { meta: { incidentId: inc.id, trigger: inc.trigger, severity: inc.severity } });
   res.status(201).json(inc);
 }));
 
@@ -52,11 +63,16 @@ router.get('/incidents', ah(async (req, res) => {
     const bad = statuses.find((s) => !STATUSES.includes(s));
     if (bad) throw new HttpError(400, `Invalid status: ${bad}`);
   }
-  const list = await incidents.listIncidents({
+  const q = parse(listQuery, { limit: req.query.limit, before: req.query.before });
+  const page = await incidents.listIncidentsPage({
     userId: req.user.role === 'responder' ? null : req.user.id,
     statuses,
+    limit: q.limit,
+    before: q.before || null,
   });
-  res.json(list);
+  // body stays a plain array (backward compatible); the exact next cursor rides in a header
+  if (page.nextCursor) res.set('X-Next-Cursor', page.nextCursor);
+  res.json(page.items);
 }));
 
 router.get('/incidents/:id', ah(async (req, res) => {
@@ -81,6 +97,7 @@ router.post('/incidents/:id/cancel', ah(async (req, res) => {
   await incidents.setFields(inc.id, { status: 'cancelled' });
   await incidents.addEvent(inc.id, 'cancelled', 'Cancelled by user (false alarm)');
   await drones.releaseForIncident(inc.id, inc.userId);
+  await audit.fromReq(req, 'incident_cancelled', { meta: { incidentId: inc.id } });
   const updated = await incidents.getIncident(inc.id);
   realtime.emitIncidentUpdated(updated);
   res.json(updated);
@@ -95,6 +112,7 @@ router.post('/incidents/:id/ack', requireRole('responder'), ah(async (req, res) 
   await incidents.setFields(inc.id, { status, responder_id: req.user.id, responder_eta_minutes: etaMinutes });
   await incidents.addEvent(inc.id, 'acknowledged', `Acknowledged by ${req.user.name} · ETA ${etaMinutes} min`,
     { responderId: req.user.id, responderName: req.user.name, etaMinutes });
+  await audit.fromReq(req, 'incident_acknowledged', { userId: inc.userId, meta: { incidentId: inc.id, etaMinutes } });
   const updated = await incidents.getIncident(inc.id);
   realtime.emitIncidentUpdated(updated);
   res.json(updated);
@@ -124,6 +142,7 @@ router.post('/incidents/:id/resolve', requireRole('responder'), ah(async (req, r
   incidents.assertOpen(inc);
   await incidents.setFields(inc.id, { status: 'resolved' });
   await incidents.addEvent(inc.id, 'resolved', `Resolved by ${req.user.name}`, { responderId: req.user.id });
+  await audit.fromReq(req, 'incident_resolved', { userId: inc.userId, meta: { incidentId: inc.id } });
   await drones.releaseForIncident(inc.id, inc.userId);
   const updated = await incidents.getIncident(inc.id);
   realtime.emitIncidentUpdated(updated);

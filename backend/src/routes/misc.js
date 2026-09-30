@@ -8,9 +8,13 @@ const drones = require('../services/drones');
 const incidents = require('../services/incidents');
 const ai = require('../services/ai');
 const realtime = require('../services/realtime');
+const { limiter } = require('../rateLimit');
 const { ah, parse, zLat, zLng, HAZARD_TYPES, SEVERITIES } = require('../util');
 
 const router = express.Router();
+
+const hazardLimiter = limiter('hazards', { windowMs: 10 * 60 * 1000, limit: 10, by: 'user', message: 'Too many hazard reports, please try again later' });
+const chatLimiter = limiter('chat', { windowMs: 60 * 1000, limit: 30, by: 'user', message: 'Too many chat messages, please slow down' });
 
 // ------------------------------------------------------------------ hazards
 router.get('/hazards', requireAuth, ah(async (req, res) => {
@@ -21,7 +25,7 @@ router.get('/hazards', requireAuth, ah(async (req, res) => {
   res.json(await hazards.getHazards(q.lat, q.lng, q.radiusKm));
 }));
 
-router.post('/hazards', requireAuth, ah(async (req, res) => {
+router.post('/hazards', requireAuth, hazardLimiter, ah(async (req, res) => {
   const body = parse(z.object({
     type: z.enum(HAZARD_TYPES),
     title: z.string().trim().min(1, 'title is required').max(140),
@@ -53,7 +57,7 @@ const chatSchema = z.object({
   context: z.record(z.string(), z.any()).optional().nullable(),
 });
 
-router.post('/chat', requireAuth, ah(async (req, res) => {
+router.post('/chat', requireAuth, chatLimiter, ah(async (req, res) => {
   const body = parse(chatSchema, req.body || {});
   const context = { country: req.user.country, ...(body.context || {}) };
   if (body.incidentId) {

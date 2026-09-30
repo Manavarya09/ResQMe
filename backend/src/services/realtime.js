@@ -4,23 +4,22 @@
  * is called, so routes can be exercised through supertest without a live socket server.
  */
 const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
 const config = require('../config');
-const db = require('../db');
+// lazy: auth.js -> db.js; avoid load-order surprises
+const authenticateToken = (t) => require('../auth').authenticateToken(t);
 
 let io = null;
 
 function init(httpServer) {
-  io = new Server(httpServer, { cors: { origin: true, credentials: true } });
+  io = new Server(httpServer, { cors: { origin: config.corsOriginOption(), credentials: true } });
   io.use(async (socket, next) => {
     try {
       const token = (socket.handshake.auth && socket.handshake.auth.token) ||
         (socket.handshake.query && socket.handshake.query.token);
       if (!token) return next(new Error('unauthorized'));
-      const payload = jwt.verify(String(token).replace(/^Bearer\s+/i, ''), config.jwtSecret, { algorithms: ['HS256'] });
-      const { rows } = await db.query('SELECT id, role FROM users WHERE id = $1', [payload.sub]);
-      if (!rows[0]) return next(new Error('unauthorized'));
-      socket.data.user = rows[0];
+      // same checks as HTTP: signature, expiry, not an MFA token, token_version still current
+      const row = await authenticateToken(String(token).replace(/^Bearer\s+/i, ''));
+      socket.data.user = { id: row.id, role: row.role };
       return next();
     } catch {
       return next(new Error('unauthorized'));
@@ -48,6 +47,11 @@ const emitIncidentLocation = (ownerId, payload) => toRooms(['responders', `user:
 const emitDroneUpdate = (drone, ownerId) => toRooms(['responders', ownerId && `user:${ownerId}`], 'drone:update', drone);
 const emitHazardNew = (hazard) => { if (io) io.emit('hazard:new', hazard); };
 
+/** Drop every live socket of a user (after logout-all / password change / account deletion). */
+function disconnectUser(userId) {
+  if (io) io.in(`user:${userId}`).disconnectSockets(true);
+}
+
 async function close() {
   if (io) {
     const s = io;
@@ -57,6 +61,6 @@ async function close() {
 }
 
 module.exports = {
-  init, close, emitIncidentNew, emitIncidentUpdated, emitIncidentLocation, emitDroneUpdate, emitHazardNew,
+  init, close, disconnectUser, emitIncidentNew, emitIncidentUpdated, emitIncidentLocation, emitDroneUpdate, emitHazardNew,
   get io() { return io; },
 };

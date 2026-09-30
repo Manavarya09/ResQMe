@@ -13,10 +13,13 @@ async function upsertUser(u) {
   const hash = await bcrypt.hash(u.password, 10);
   const { rows } = await db.query(
     `INSERT INTO users (name, email, password_hash, phone, role) VALUES ($1,$2,$3,$4,$5)
-     ON CONFLICT (email) DO UPDATE SET name=EXCLUDED.name, password_hash=EXCLUDED.password_hash, phone=EXCLUDED.phone, role=EXCLUDED.role
+     ON CONFLICT (email) DO UPDATE SET name=EXCLUDED.name, password_hash=EXCLUDED.password_hash, phone=EXCLUDED.phone, role=EXCLUDED.role,
+       -- demo accounts always come back with MFA off
+       mfa_enabled=false, mfa_secret=NULL, mfa_pending_secret=NULL, mfa_last_step=NULL
      RETURNING id`,
     [u.name, u.email, hash, u.phone, u.role]
   );
+  await db.query('DELETE FROM mfa_recovery_codes WHERE user_id = $1', [rows[0].id]);
   return rows[0].id;
 }
 

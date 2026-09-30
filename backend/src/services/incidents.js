@@ -35,17 +35,32 @@ async function getEvents(id) {
   return rows.map(rowToEvent);
 }
 
-async function listIncidents({ userId = null, statuses = null, limit = 200 } = {}) {
+/**
+ * Newest-first page of incidents. `before` is an exclusive createdAt cursor (ISO string; may carry
+ * microseconds). Returns { items, nextCursor } — nextCursor is the exact (µs) createdAt of the last
+ * item when the page is full, else null.
+ */
+async function listIncidentsPage({ userId = null, statuses = null, limit = 50, before = null } = {}) {
   const where = [];
   const params = [];
   if (userId) { params.push(userId); where.push(`i.user_id = $${params.length}`); }
   if (statuses && statuses.length) { params.push(statuses); where.push(`i.status = ANY($${params.length})`); }
+  if (before) { params.push(before); where.push(`i.created_at < $${params.length}::timestamptz`); }
   params.push(limit);
   const { rows } = await db.query(
-    `${SELECT} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY i.created_at DESC LIMIT $${params.length}`,
+    `SELECT q.*, to_char(q.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor
+       FROM (${SELECT} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY i.created_at DESC LIMIT $${params.length}) q
+      ORDER BY q.created_at DESC`,
     params
   );
-  return rows.map(rowToIncident);
+  return {
+    items: rows.map(rowToIncident),
+    nextCursor: rows.length === limit && rows.length ? rows[rows.length - 1].cursor : null,
+  };
+}
+
+async function listIncidents(opts = {}) {
+  return (await listIncidentsPage({ limit: 200, ...opts })).items;
 }
 
 async function addEvent(incidentId, type, message, data = {}, client = db) {
@@ -136,6 +151,6 @@ async function setFields(id, fields) {
 }
 
 module.exports = {
-  rowToIncident, getIncident, getEvents, listIncidents, addEvent, addEventAndBroadcast,
+  rowToIncident, getIncident, getEvents, listIncidents, listIncidentsPage, addEvent, addEventAndBroadcast,
   createIncident, loadForUser, assertOpen, setFields, CLOSED,
 };

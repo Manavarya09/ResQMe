@@ -18,7 +18,7 @@ describe('auth', () => {
     expect(res.body.token).toEqual(expect.any(String));
     expect(res.body.user).toEqual({
       id: expect.any(String), name: 'Asha', email: 'asha@example.com', phone: '+91 99999 00000',
-      role: 'user', country: 'IN', settings: {}, createdAt: expect.any(String),
+      role: 'user', country: 'IN', settings: {}, mfaEnabled: false, createdAt: expect.any(String),
     });
     expect(res.body.user.password_hash).toBeUndefined();
     const decoded = jwt.verify(res.body.token, process.env.JWT_SECRET, { algorithms: ['HS256'] });

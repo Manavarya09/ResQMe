@@ -5,6 +5,8 @@ const db = require('../db');
 const { requireAuth } = require('../auth');
 const { getMedicalId, putMedicalId, listContacts } = require('../services/medical');
 const { randomToken } = require('../services/crypto');
+const audit = require('../services/audit');
+const config = require('../config');
 const { ah, parse, HttpError, toIso } = require('../util');
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'];
@@ -31,13 +33,18 @@ const medicalSchema = z.object({
 const dropNulls = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== null && v !== undefined));
 const clean = (obj) => ({ ...dropNulls(obj), medications: (obj.medications || []).map(dropNulls) });
 
-async function loadShare(token) {
+async function loadShare(token, req, via) {
   if (!token || token.length > 100) return null;
   const { rows } = await db.query(
-    `SELECT s.user_id, s.expires_at, u.name, u.phone FROM share_tokens s JOIN users u ON u.id = s.user_id
+    `SELECT s.user_id, s.expires_at, s.created_at, u.name, u.phone FROM share_tokens s JOIN users u ON u.id = s.user_id
       WHERE s.token = $1 AND s.expires_at > now()`, [token]
   );
   if (!rows[0]) return null;
+  // transparency: the owner can see every time their medical ID was opened, and from where
+  await audit.record('medical_share_viewed', {
+    userId: rows[0].user_id, actorId: null, ip: req.ip || null,
+    meta: { via, shareCreatedAt: toIso(rows[0].created_at), userAgent: String(req.get('user-agent') || '').slice(0, 200) },
+  });
   const [medical, contacts] = await Promise.all([getMedicalId(rows[0].user_id), listContacts(rows[0].user_id)]);
   return { name: rows[0].name, phone: rows[0].phone, medical, contacts, expiresAt: toIso(rows[0].expires_at) };
 }
@@ -52,18 +59,23 @@ api.get('/medical-id', requireAuth, ah(async (req, res) => {
 api.put('/medical-id', requireAuth, ah(async (req, res) => {
   const body = parse(medicalSchema, req.body || {});
   const { updatedAt, ...data } = body; // eslint-disable-line no-unused-vars
-  res.json(await putMedicalId(req.user.id, clean(data)));
+  const saved = await putMedicalId(req.user.id, clean(data));
+  await audit.fromReq(req, 'medical_id_updated');
+  res.json(saved);
 }));
 
 api.post('/medical-id/share-token', requireAuth, ah(async (req, res) => {
   const token = randomToken(18);
   const expiresAt = new Date(Date.now() + SHARE_TTL_MS);
   await db.query('INSERT INTO share_tokens (token, user_id, expires_at) VALUES ($1,$2,$3)', [token, req.user.id, expiresAt]);
-  res.json({ token, url: `/m/${token}`, expiresAt: expiresAt.toISOString() });
+  const url = `/m/${token}`;
+  const base = config.publicUrl || `${req.protocol}://${req.get('host')}`;
+  await audit.fromReq(req, 'medical_share_created', { meta: { expiresAt: expiresAt.toISOString() } });
+  res.json({ token, url, absoluteUrl: `${base}${url}`, expiresAt: expiresAt.toISOString() });
 }));
 
 api.get('/medical-id/public/:token', ah(async (req, res) => {
-  const data = await loadShare(req.params.token);
+  const data = await loadShare(req.params.token, req, 'api');
   if (!data) throw new HttpError(404, 'Share link is invalid or has expired');
   const { expiresAt, ...rest } = data; // eslint-disable-line no-unused-vars
   res.json(rest);
@@ -141,7 +153,7 @@ function renderMissing() {
 
 const page = express.Router();
 page.get('/m/:token', ah(async (req, res) => {
-  const data = await loadShare(req.params.token);
+  const data = await loadShare(req.params.token, req, 'page');
   res.set('Cache-Control', 'no-store');
   if (!data) return res.status(404).type('html').send(renderMissing());
   return res.type('html').send(renderPage(data));
