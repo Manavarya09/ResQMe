@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, ScrollView, Linking, Platform } from 'react-native';
 import Text from '../components/Text';
-import { Siren, Shield, Flame, Ambulance, PhoneCall, Activity, MapPin, Route, Bot, GraduationCap, ChevronRight, Zap, HeartHandshake } from 'lucide-react-native';
+import { Siren, Shield, Flame, Ambulance, PhoneCall, Activity, MapPin, Route, Bot, GraduationCap, ChevronRight, ShieldAlert, Zap, HeartHandshake } from 'lucide-react-native';
 import { Screen, Card, PressScale, SectionLabel, Pill, IconButton } from '../components/ui';
 import SOSButton from '../components/SOSButton';
 import SetupChecklist from '../components/SetupChecklist';
@@ -149,6 +149,7 @@ export default function HomeScreen({ navigation }) {
             body={tracking.status === 'tracking' ? 'We alert help if you leave the route or run late' : 'Draw a route and set a time limit — we watch over you'}
             onPress={() => navigation.navigate('Map')}
           />
+          <Shortcut icon={ShieldAlert} color={colors.primary} title="Safety tools" body="Loud siren, fake call, share your location" onPress={() => navigation.navigate('SafetyTools')} />
           <Shortcut icon={Bot} color={colors.blue} title="AI crisis guide" body="Step-by-step help for injuries, panic and danger" onPress={() => navigation.navigate('Chat')} />
           <Shortcut icon={GraduationCap} color={colors.green} title="2-minute first aid" body="CPR, bleeding, choking, burns and more" onPress={() => navigation.navigate('Training')} />
         </View>

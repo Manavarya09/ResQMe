@@ -26,6 +26,8 @@ import OnboardingScreen from './src/screens/onboarding';
 import ProfileScreen from './src/screens/ProfileScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import IncidentDetailScreen from './src/screens/IncidentDetailScreen';
+import SafetyToolsScreen from './src/screens/SafetyToolsScreen';
+import { useShakeSOS } from './src/hooks/useShakeSOS';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -41,6 +43,8 @@ const TABS = [
 ];
 
 function Tabs() {
+  // Tabs stay mounted for the whole signed-in session, so shake-to-SOS is always listening.
+  useShakeSOS();
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
@@ -104,6 +108,7 @@ export default function Navigation() {
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="History" component={HistoryScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="IncidentDetail" component={IncidentDetailScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="SafetyTools" component={SafetyToolsScreen} options={{ animation: 'slide_from_right' }} />
           </>
         )}
       </Stack.Navigator>

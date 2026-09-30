@@ -58,7 +58,8 @@
         {
           "faceIDPermission": "Unlock ResQMe with Face ID."
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "scheme": "resqme"
   }
