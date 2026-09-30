@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, ScrollView, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { Text } from '../components/Text';
 import * as Speech from 'expo-speech';
-import { Bot, Send, Volume2, VolumeX, PlayCircle, Video, Droplet, HeartPulse, Frown, Brain, Car, ShieldAlert, Siren, Phone } from 'lucide-react-native';
+import { Bot, Send, Volume2, VolumeX, PlayCircle, Video, Droplet, HeartPulse, Frown, Brain, Car, ShieldAlert, Siren, Phone, Trash2 } from 'lucide-react-native';
 import { Screen, IconButton, PressScale, Pill } from '../components/ui';
 import { api } from '../lib/api';
+import { getJSON, setJSON, removeItem } from '../lib/storage';
 import { getTraining } from '../lib/training';
 import { getCountry } from '../lib/dialCodes';
 import { useAuth } from '../context/AuthContext';
@@ -21,7 +23,11 @@ const QUICK = [
   { icon: Brain, label: "I'm having a panic attack", color: '#8b5cf6' },
 ];
 
+const MAX_STORED = 50;
+const chatKey = (userId) => `resqme.chat.${userId || 'anon'}`;
+
 const GREETING = {
+  greeting: true,
   role: 'assistant',
   content: "I'm ResQMe, your crisis guide. Tell me what's happening, or tap an option below. If someone isn't breathing or is bleeding heavily, call emergency services first.",
   suggestions: [],
@@ -34,6 +40,7 @@ export default function ChatScreen({ navigation }) {
   const [messages, setMessages] = useState([GREETING]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const medicalRef = useRef(null);
   const scrollRef = useRef(null);
   const country = getCountry(user?.country);
@@ -42,13 +49,50 @@ export default function ChatScreen({ navigation }) {
     api.getMedical().then((m) => (medicalRef.current = m)).catch(() => {});
   }, []);
 
-  // Switch into incident mode when an emergency starts.
+  // Restore the last conversation for this account. Anything said before the restore finishes
+  // (e.g. the incident-mode prompt) is kept after the restored history.
+  const userId = user?.id;
+  useEffect(() => {
+    let cancelled = false;
+    setHydrated(false);
+    getJSON(chatKey(userId), []).then((saved) => {
+      if (cancelled) return;
+      const history = Array.isArray(saved) ? saved.filter((m) => m && m.role && typeof m.content === 'string' && !m.greeting) : [];
+      if (history.length) setMessages((cur) => [GREETING, ...history, ...cur.filter((m) => !m.greeting)]);
+      setHydrated(true);
+    });
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  // Persist the last 50 messages (the greeting is rebuilt on load, never stored).
+  useEffect(() => {
+    if (!hydrated) return;
+    const toStore = messages.filter((m) => !m.greeting).slice(-MAX_STORED);
+    if (toStore.length) setJSON(chatKey(userId), toStore);
+    else removeItem(chatKey(userId));
+  }, [messages, hydrated, userId]);
+
+  const clearChat = useCallback(() => {
+    const go = () => {
+      Speech.stop();
+      setMessages([GREETING]);
+      removeItem(chatKey(userId));
+    };
+    if (Platform.OS === 'web') return go();
+    Alert.alert('Clear conversation?', 'This removes the chat history saved on this device.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: go },
+    ]);
+  }, [userId]);
+
+  // Switch into incident mode when an emergency starts (once per incident, even across restarts).
   const incidentId = isActive ? incident?.id : null;
   useEffect(() => {
     if (!incidentId) return;
-    setMessages((m) => [
+    setMessages((m) => m.some((x) => x.incidentId === incidentId) ? m : [
       ...m,
       {
+        incidentId,
         role: 'assistant',
         content: `Help has been alerted (${TRIGGER_LABEL[incident.trigger]}). Responders can see your location${incident.medicalSnapshot ? ' and medical ID' : ''}. I'll stay with you — are you or anyone else injured?`,
         suggestions: ["I'm injured", 'Someone else is hurt', "I'm safe but scared"],
@@ -65,7 +109,7 @@ export default function ChatScreen({ navigation }) {
     setBusy(true);
     try {
       const res = await api.chat({
-        messages: next.filter((m) => m !== GREETING).map(({ role, content: c }) => ({ role, content: c })).slice(-12),
+        messages: next.filter((m) => !m.greeting && !m.error).map(({ role, content: c }) => ({ role, content: c })).slice(-12),
         incidentId: incidentId || undefined,
         context: {
           incidentActive: !!incidentId,
@@ -109,6 +153,11 @@ export default function ChatScreen({ navigation }) {
             </View>
           </View>
           <View className="flex-row gap-2">
+            {messages.length > 1 && (
+              <IconButton onPress={clearChat} accessibilityLabel="Clear chat">
+                <Trash2 color={colors.muted} size={17} />
+              </IconButton>
+            )}
             <IconButton onPress={() => { Speech.stop(); updateSettings({ speakReplies: !settings.speakReplies }); }} accessibilityLabel="Read replies aloud">
               {settings.speakReplies ? <Volume2 color={colors.primary} size={18} /> : <VolumeX color={colors.muted} size={18} />}
             </IconButton>
@@ -132,7 +181,7 @@ export default function ChatScreen({ navigation }) {
           {messages.map((m, i) => (
             <Bubble key={i} m={m} onVideo={(id) => navigation.navigate('TrainingDetail', { id })} />
           ))}
-          {messages.length === 1 && (
+          {messages.length === 1 && !busy && (
             <View className="flex-row flex-wrap gap-2 mt-1 ml-12">
               {QUICK.map((q) => (
                 <PressScale key={q.label} onPress={() => send(q.label)}>
