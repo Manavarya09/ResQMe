@@ -4,7 +4,7 @@ import Text from '../components/Text';
 import * as LocalAuthentication from 'expo-local-authentication';
 import {
   ShieldCheck, Mail, Smartphone, Lock, Satellite, Fingerprint, LogOut, Activity, MapPin, Bell, HeartPulse, Users,
-  ChevronRight, Globe, Server, GraduationCap, Volume2, Zap,
+  ChevronRight, Globe, Server, GraduationCap, Volume2, Zap, UserRound, History,
 } from 'lucide-react-native';
 import { Screen, Header, Card, Inset, ToggleRow, SectionLabel, PressScale, Pill, Button } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -47,6 +47,7 @@ export default function SettingsScreen({ navigation }) {
 
         <SectionLabel>Account & security</SectionLabel>
         <Inset className="p-0">
+          <LinkRow icon={UserRound} title="Edit profile" onPress={() => navigation.navigate('Profile')} />
           <Row icon={Mail} title="Email" value={user?.email} />
           <Row icon={Smartphone} title="Phone" value={user?.phone || 'Not set'} />
           <Row icon={Lock} title="Data encryption" value="AES-256-GCM active" valueColor={colors.green} />
@@ -96,6 +97,7 @@ export default function SettingsScreen({ navigation }) {
         <Inset className="p-0">
           <LinkRow icon={Users} title="Emergency contacts" onPress={() => navigation.navigate('Contacts')} />
           <LinkRow icon={HeartPulse} title="Medical ID" onPress={() => navigation.navigate('Medical')} />
+          <LinkRow icon={History} title="Incident history" onPress={() => navigation.navigate('History')} />
           <LinkRow icon={GraduationCap} title="First-aid training" onPress={() => navigation.navigate('Training')} last />
         </Inset>
 
